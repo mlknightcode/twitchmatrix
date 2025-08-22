@@ -1,0 +1,86 @@
+created html file
+uses hardcoded prioritized list of streamers
+uses full graphql query to determine live
+lists streamers as it goes through them and marks offline and online
+generates twitchtv
+generates multitwitch
+---
+host on synology
+via webstation
+add apache, removed
+add allow user home, removed
+add personal website, removed
+copy file over as twitchmatrix.html
+access via 192.168.167.10/twitchmatrix.html
+---
+split into 4 tiers
+ability to dictate size
+ability to dictate limit per tier
+ability to randomize tier
+no autorefresh
+generate button
+access via 192.168.167.10/twitchtiers.html
+---
+add blacklist
+access via 192.168.167.10/twitchblacklist.html
+---
+add pinning and updated blacklist
+add categories
+add yellow box for pinned, remove bold
+add pink box for blacklisted, remove strike
+access via 192.168.167.10/twitchpins.html
+---
+add quantity fill back
+access via 192.168.167.10/twitchquantity.html
+---
+add batch process
+add yellow asterisk indicator
+add retrieve and generate separation
+update looks
+access via 192.168.167.10/twitchspeed.html
+---
+update default batch and limit values
+move batch to front
+move asterisk to left
+remove outlines for pin and blacklist
+shrink width between tiers
+adjust category truncation
+access via 192.168.167.10/twitchrefine.html
+---
+add persistence for batch, size, limits, random
+add up down adjusters for batch, size, limits
+add new tier5 irl and tier6 just chatting
+access via 192.168.167.10/twitchcategories.html
+---
+add preview clicking on active name
+add previews clicking on tier
+tiers 5 and 6 should not have unlimited pin and blacklist persistence
+access via 192.168.167.10/twitchpreviews.html
+---
+change limits to use buttons on top and bottom of input field for better organization
+new matrix button that embeds
+access via https://192-168-167-10.sslip.io/twitchembed.html
+---
+add dynamically changing embeds to select best layout depending on screen size
+access via https://192-168-167-10.sslip.io/twitchdynamic.html
+---
+add poll input
+make up down vertical for poll batch size
+switch to dynamic twitch feeds instead of iframe
+add status icons to twitch feeds
+add poll healing for bad feeds
+add status messages for feed fixes
+access via https://192-168-167-10.sslip.io/twitchheal.html
+failed, marked laptop file as failed, deleted from synology
+---
+create legacy folder and move files into it
+create project folder and move legacy folder into it
+move project folder to documents
+create github account
+install brew
+install git
+install git extensions in vscode
+commit push to git
+make public
+publish page
+https://mlknightcode.github.io/twitchmatrix/

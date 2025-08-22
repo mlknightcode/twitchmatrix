@@ -1,0 +1,20 @@
+grid is present at load with full streamers
+up down adjusters work
+persistence works for input fields except pin and blacklist
+persistence for pin and blacklist clears for 1-4, 5-6 stays only for active streamers
+batch field does increase speed of retrieval
+size field does restrict streamers
+limits field does restrict streamers per tier
+randomize works
+pinning works
+blacklist works
+size back-fill works by iterating over previous tiers
+tier 5 and tier 6 are present
+name previews work
+tier previews work
+feeds dynamically resize based on screen size
+retrieve button works
+generate button works
+matrix button works
+open twitch theater works
+open multi twitch works
