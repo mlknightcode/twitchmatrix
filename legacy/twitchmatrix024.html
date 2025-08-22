@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Twitch Matrix Generator</title>
+<style>
+    body { font-family: Arial, sans-serif; background: #222; color: #fff; padding: 20px; }
+    .status { margin-top: 20px; }
+    .online { color: lime; }
+    .offline { color: red; }
+    button { padding: 10px 20px; font-size: 16px; background-color: #9146FF; color: white; border: none; cursor: pointer; }
+    button:disabled { background-color: #555; cursor: not-allowed; }
+    button:hover:enabled { background-color: #772ce8; }
+    .button-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+  </style>
+</head>
+<body style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+<h1>Twitch Matrix</h1>
+<p>Finds up to 6 streamers and shows a TwitchTheater and MultiTwitch link.</p>
+<div class="button-row">
+<button disabled="" id="openLink">Open TwitchTheater</button>
+<button disabled="" id="openMulti">Open MultiTwitch</button>
+</div>
+<div class="status" id="status">Checking streamers...</div>
+<script>
+    const streamers = ["onigiri", "qtcinderella", "lo3tus", "jinnytty", "aprylanonymous", "potentialbliss", "rennsz", "hazunats", "knut", "hippiefix", "extraemily", "bonnie", "recharg_ing", "classic_christine", "ibabyrainbow", "mhyochi", "magicallyconsumed", "waterlynn", "robcdee", "chloe__irl", "emiru", "hachubby", "lizzy_senrose", "dinomitetwins", "jengo_m", "ninthchild", "bawnsai", "ira_aba", "justketh", "crispyjenny", "jellyhaeni", "mizkif", "juliakins", "studytme", "kumamonster", "daveezz", "gaijin1up", "fido_tw", "hello_kiko", "dskoopa", "jaystreazy", "hitch", "yoshimyan", "therealshookon3", "4amlaundry", "nezst", "danioskam", "crunk_muffin", "nessalpaca", "rellik", "ridetheline", "clararline", "melibela", "arrav", "cooksux", "missmikkaa", "barktok", "fuslie", "soleastellaa", "igumdrop", "d3nduro", "voyagesdiary", "nomadicgaijin", "tiffanobi", "kiwhiskey", "lychee", "yubababoo", "thecranecouple", "jonsf", "cybersteffie", "gogoborgor", "foxiekt", "terrybarentsen", "sahranisworld", "miki_tokyo", "claraatwork", "manukiemi", "misterarther", "stephaniequatro", "cinna", "mewmelodys", "poultry_motion", "architecturetv", "mrpol", "nmplol", "cherlosthome", "ppim", "zumi", "eddy2travel", "kydeanderic", "maimaittv", "wolfsbanee", "soweq", "tymwits", "jinritv", "relit20", "awkwards_travel", "crack_eggs", "miekii", "0greprincess", "sarahbridgewater", "botezlive", "wasabiicat", "bottlehead", "yurijoa", "meesterkeem", "henukei", "liniwalks", "cecehustle", "tokidokitraveller", "globiklive", "w3cj", "arianakatana", "slipstreamjc", "jakenbakelive", "retrogaijin", "dizzykitten", "donutkingtv", "zep_aki", "agctv", "hapipy"];
+
+    const clientId = "kimne78kx3ncx6brgo4mv6wki5h1ko";
+    const query = `query($login: String!) {
+      user(login: $login) {
+        stream { id }
+      }
+    }`;
+
+    const fetchLiveStatus = async (name) => {
+      const res = await fetch("https://gql.twitch.tv/gql", {
+        method: "POST",
+        headers: {
+          "Client-ID": clientId,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify([{ operationName: null, query, variables: { login: name } }])
+      });
+      const data = await res.json();
+      return data[0]?.data?.user?.stream !== null;
+    };
+
+    const statusEl = document.getElementById("status");
+    const openBtn = document.getElementById("openLink");
+    const multiBtn = document.getElementById("openMulti");
+    let finalURL = "";
+    let multiURL = "";
+
+    const checkStreamers = async () => {
+      const live = [];
+      statusEl.innerHTML = "";
+      for (const name of streamers) {
+        const isLive = await fetchLiveStatus(name);
+        const statusText = `${name} <span class="${isLive ? "online" : "offline"}">${isLive ? "online" : "offline"}</span><br>`;
+        statusEl.innerHTML += statusText;
+        if (isLive) live.push(name);
+        if (live.length >= 6) break;
+      }
+      if (live.length) {
+        finalURL = `https://twitchtheater.tv/${live.join("/")}`;
+        multiURL = `https://multitwitch.tv/${live.join("/")}`;
+        openBtn.disabled = false;
+        multiBtn.disabled = false;
+      }
+    };
+
+    openBtn.onclick = () => {
+      if (finalURL) window.open(finalURL, "_blank");
+    };
+
+    multiBtn.onclick = () => {
+      if (multiURL) window.open(multiURL, "_blank");
+    };
+
+    checkStreamers();
+    setInterval(() => location.reload(), 20 * 60 * 1000);
+  </script>
+</body>
+</html>

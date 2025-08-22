@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Twitch Matrix Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #222;
+      color: #fff;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .online { color: lime; }
+    .offline { color: red; }
+    .unknown { color: gray; }
+    .pinned {
+      border: 1px solid yellow;
+      padding: 1px 3px;
+    }
+    .blacklisted {
+      border: 1px solid hotpink;
+      padding: 1px 3px;
+    }
+    .button-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .grid {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .tier {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .tier h3 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .streamer { margin: 2px 0; }
+    .status {
+      margin-top: 20px;
+      text-align: center;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #9146FF;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #555;
+      cursor: not-allowed;
+    }
+    button:hover:enabled {
+      background-color: #772ce8;
+    }
+    label {
+      margin: 0 5px;
+      display: flex;
+      align-items: center;
+    }
+    input[type="text"] {
+      padding: 5px;
+      width: 80px;
+    }
+    .pin-btn, .black-btn {
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 4px;
+    }
+    .pin-btn.active { color: lime; }
+    .black-btn.active { color: red; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Twitch Matrix</h1>
+    <p>Finds live streamers and shows TwitchTheater and MultiTwitch links.</p>
+
+    <div class="button-row">
+      <label>Size: <input type="text" id="inputSize" value="6"></label>
+      <label>Limits (4 digits): <input type="text" id="inputLimits" value="6000" maxlength="4"></label>
+    </div>
+    <div class="button-row">
+      <label><input type="checkbox" id="rand1"> Random Tier 1</label>
+      <label><input type="checkbox" id="rand2"> Random Tier 2</label>
+      <label><input type="checkbox" id="rand3"> Random Tier 3</label>
+      <label><input type="checkbox" id="rand4"> Random Tier 4</label>
+      <button id="generateBtn">Generate</button>
+    </div>
+    <div class="button-row">
+      <button disabled id="openLink">Open TwitchTheater</button>
+      <button disabled id="openMulti">Open MultiTwitch</button>
+    </div>
+  </div>
+
+  <div class="grid" id="gridContainer"></div>
+  <div class="status" id="status">Ready to check streamers...</div>
+
+<script>
+const tier1 = ["jinnytty","extraemily","bonnie","qtcinderella","emiru","knut","onigiri","mhyochi","jaystreazy","waterlynn","jakenbakelive","lo3tus","rennsz","hachubby","crispyjenny","jellyhaeni","hazunats","aprylanonymous","potentialbliss","hippiefix","ibabyrainbow","magicallyconsumed","recharg_ing","chloe__irl","kumamonster","dinomitetwins","nezst","jonsf","daveezz","studytme","jengo_m","ninthchild","bawnsai","ira_aba","justketh"];
+const tier2 = ["yoshimyan","mizkif","juliakins","lizzy_senrose","cherlosthome","hello_kiko","fuslie","hitch","sarahbridgewater","therealshookon3","4amlaundry","nessalpaca","rellik","clararline","melibela","arrav","cooksux","meesterkeem","soleastellaa","globiklive","manukiemi","misterarther","cinna","robcdee","ridetheline","poultry_motion","fido_tw","d3nduro","stephaniequatro","foxiekt","classic_christine","wasabiicat","lychee","kiwhiskey"];
+const tier3 = ["dskoopa","voyagesdiary","tiffanobi","gaijin1up","nomadicgaijin","yubababoo","thecranecouple","cybersteffie","gogoborgor","terrybarentsen","sahranisworld","miki_tokyo","claraatwork","mrpol","barktok","missmikkaa","nmplol","ppim","zumi","kydeanderic","botezlive","danioskam","crunk_muffin","architecturetv"];
+const tier4 = ["maimaittv","wolfsbanee","soweq","tymwits","jinritv","relit20","awkwards_travel","crack_eggs","miekii","0greprincess","bottlehead","yurijoa","igumdrop","henukei","liniwalks","cecehustle","tokidokitraveller","w3cj","arianakatana","slipstreamjc","retrogaijin","dizzykitten","donutkingtv","zep_aki","agctv","hapipy","eddy2travel","mewmelodys"];
+const tiers = [tier1, tier2, tier3, tier4];
+const clientId = "kimne78kx3ncx6brgo4mv6wki5h1ko";
+
+const query = `query($login: String!) {
+  user(login: $login) {
+    stream {
+      id
+      game { name }
+    }
+  }
+}`;
+
+let finalURL = "", multiURL = "";
+const statusEl = document.getElementById("status");
+const openBtn = document.getElementById("openLink");
+const multiBtn = document.getElementById("openMulti");
+
+function getPinList() {
+  return new Set([...document.querySelectorAll(".pin-btn.active")].map(btn => btn.dataset.name));
+}
+function getBlacklist() {
+  return new Set([...document.querySelectorAll(".black-btn.active")].map(btn => btn.dataset.name));
+}
+function abbreviateCategory(cat) {
+  return cat.split(/\s+/).map(w => w.slice(0, 3)).join(" ");
+}
+function setupGrid() {
+  const grid = document.getElementById("gridContainer");
+  grid.innerHTML = "";
+  tiers.forEach((tier, idx) => {
+    const col = document.createElement("div");
+    col.className = "tier";
+    col.innerHTML = `<h3>Tier ${idx + 1}</h3>`;
+    tier.forEach(name => {
+      const row = document.createElement("div");
+      row.className = "streamer";
+
+      const pinBtn = document.createElement("button");
+      pinBtn.className = "pin-btn";
+      pinBtn.innerText = "✔";
+      pinBtn.dataset.name = name;
+      pinBtn.onclick = () => {
+        pinBtn.classList.toggle("active");
+        blackBtn.classList.remove("active");
+        updateStyle(name);
+      };
+
+      const blackBtn = document.createElement("button");
+      blackBtn.className = "black-btn";
+      blackBtn.innerText = "✖";
+      blackBtn.dataset.name = name;
+      blackBtn.onclick = () => {
+        blackBtn.classList.toggle("active");
+        pinBtn.classList.remove("active");
+        updateStyle(name);
+      };
+
+      const span = document.createElement("span");
+      span.id = `status-${name}`;
+      span.textContent = name;
+      span.className = "unknown";
+
+      row.append(pinBtn, blackBtn, span);
+      col.appendChild(row);
+    });
+    grid.appendChild(col);
+  });
+}
+
+function updateStyle(name) {
+  const span = document.getElementById(`status-${name}`);
+  if (!span) return;
+  span.classList.remove("pinned", "blacklisted");
+  if (document.querySelector(`.pin-btn[data-name="${name}"]`)?.classList.contains("active")) {
+    span.classList.add("pinned");
+  }
+  if (document.querySelector(`.black-btn[data-name="${name}"]`)?.classList.contains("active")) {
+    span.classList.add("blacklisted");
+  }
+}
+
+function shuffledCopy(arr) {
+  return [...arr].map(value => ({ value, sort: Math.random() }))
+                 .sort((a, b) => a.sort - b.sort)
+                 .map(({ value }) => value);
+}
+
+async function fetchLiveStatus(name) {
+  const res = await fetch("https://gql.twitch.tv/gql", {
+    method: "POST",
+    headers: {
+      "Client-ID": clientId,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify([{ operationName: null, query, variables: { login: name } }])
+  });
+  const data = await res.json();
+  const stream = data[0]?.data?.user?.stream;
+  return {
+    isLive: !!stream,
+    category: stream?.game?.name || null
+  };
+}
+
+async function checkStreamers() {
+  const prevPins = getPinList();
+  const prevBlacklist = getBlacklist();
+  setupGrid();
+  document.querySelectorAll(".streamer").forEach(row => {
+    const name = row.querySelector("span")?.id.replace("status-", "");
+    if (!name) return;
+    const pinBtn = row.querySelector(".pin-btn");
+    const blackBtn = row.querySelector(".black-btn");
+    const label = document.getElementById(`status-${name}`);
+    if (prevPins.has(name)) {
+      pinBtn.classList.add("active");
+      label.classList.add("pinned");
+    }
+    if (prevBlacklist.has(name)) {
+      blackBtn.classList.add("active");
+      label.classList.add("blacklisted");
+    }
+  });
+
+  const size = parseInt(document.getElementById("inputSize").value || "6", 10);
+  const limitsRaw = document.getElementById("inputLimits").value || "6000";
+  const tierLimits = limitsRaw.padEnd(4, "0").slice(0, 4).split("").map(n => parseInt(n, 10));
+  const tierRandomize = [
+    document.getElementById("rand1").checked,
+    document.getElementById("rand2").checked,
+    document.getElementById("rand3").checked,
+    document.getElementById("rand4").checked
+  ];
+  const pinned = getPinList();
+  const blacklist = getBlacklist();
+
+  const live = [];
+  const usedTiers = [];
+  const tierLiveCounts = [0, 0, 0, 0];
+  statusEl.innerHTML = "";
+
+  for (let i = 0; i < tiers.length; i++) {
+    const tier = tiers[i];
+    const limit = tierLimits[i];
+    const pinsFirst = tier.filter(n => pinned.has(n));
+    const rest = tier.filter(n => !pinned.has(n));
+    const checkList = tierRandomize[i] ? [...pinsFirst, ...shuffledCopy(rest)] : [...pinsFirst, ...rest];
+
+    for (const name of checkList) {
+      if (blacklist.has(name)) continue;
+      if (tierLiveCounts[i] >= limit) break;
+
+      const { isLive, category } = await fetchLiveStatus(name);
+      const span = document.getElementById(`status-${name}`);
+      if (span) {
+        span.classList.remove("online", "offline", "unknown");
+        span.classList.add(isLive ? "online" : "offline");
+        span.textContent = isLive && category ? `${name} (${abbreviateCategory(category)})` : name;
+      }
+      if (isLive) {
+        tierLiveCounts[i]++;
+        live.push(name);
+        if (!usedTiers.includes(`Tier ${i + 1}`)) usedTiers.push(`Tier ${i + 1}`);
+      }
+      if (live.length >= size) break;
+    }
+    if (live.length >= size) break;
+  }
+
+  if (live.length) {
+    finalURL = `https://twitchtheater.tv/${live.join("/")}`;
+    multiURL = `https://multitwitch.tv/${live.join("/")}`;
+    openBtn.disabled = false;
+    multiBtn.disabled = false;
+    statusEl.innerHTML = `<br><strong>Streamers pulled from: ${usedTiers.join(", ")}</strong>`;
+  } else {
+    statusEl.innerHTML = "<br>No live streamers found.";
+  }
+}
+
+document.addEventListener("DOMContentLoaded", setupGrid);
+document.getElementById("generateBtn").onclick = checkStreamers;
+openBtn.onclick = () => finalURL && window.open(finalURL, "_blank");
+multiBtn.onclick = () => multiURL && window.open(multiURL, "_blank");
+</script>
+</body>
+</html>
