@@ -767,6 +767,38 @@ function openMatrix() {
 
   function applyLayout() {
     const n = Math.max(1, lastLive.length);
+    const tiles = matrixBody.children;
+
+    // Reset any previous explicit placement
+    Array.from(tiles).forEach(t => {
+      t.style.gridColumn = '';
+      t.style.gridRow = '';
+    });
+    matrixBody.style.gridTemplateColumns = '';
+    matrixBody.style.gridTemplateRows = '';
+
+    // Special mosaics for specific counts
+    if (n === 5) {
+      matrixBody.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
+      matrixBody.style.gridTemplateRows = 'repeat(2, minmax(0, 1fr))';
+      if (tiles[0]) {
+        tiles[0].style.gridColumn = 'span 2';
+        tiles[0].style.gridRow = 'span 2';
+      }
+      return;
+    }
+
+    if (n === 7) {
+      matrixBody.style.gridTemplateColumns = 'repeat(5, minmax(0, 1fr))';
+      matrixBody.style.gridTemplateRows = 'repeat(2, minmax(0, 1fr))';
+      if (tiles[0]) {
+        tiles[0].style.gridColumn = 'span 2';
+        tiles[0].style.gridRow = 'span 2';
+      }
+      return;
+    }
+
+    // Default responsive layout
     const gap = parseFloat(getComputedStyle(matrixBody).gap || "8");
     const rect = matrixBody.getBoundingClientRect();
     const cols = optimalCols(n, rect.width, rect.height, gap || 8);
