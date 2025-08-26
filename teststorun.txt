@@ -16,5 +16,6 @@ feeds dynamically resize based on screen size
 retrieve button works
 generate button works
 matrix button works
+refresh button works
 open twitch theater works
 open multi twitch works
