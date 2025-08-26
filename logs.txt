@@ -84,3 +84,6 @@ commit push to git
 make public
 publish page
 https://mlknightcode.github.io/twitchmatrix/
+---
+add refresh button on modal to retrieve, generate, matrix
+attempt to dynamically size videos correctly
