@@ -734,8 +734,10 @@ function openMatrix() {
   });
 
   function optimalCols(n, W, H, gap) {
-    // Try all column counts 1..n; pick best that fits vertically and maximizes tile area
-    let best = {cols: 1, area: -1, overflow: Infinity};
+    // Try all column counts 1..n; pick best that fits vertically and maximizes score
+    const penalty = 1000;
+    const penalty2 = 10000;
+    let best = {cols: 1, score: -Infinity, overflow: Infinity};
     for (let cols = 1; cols <= n; cols++) {
       const rows = Math.ceil(n / cols);
       const totalGapW = gap * (cols - 1);
@@ -745,19 +747,18 @@ function openMatrix() {
       const gridH = rows * tileH + totalGapH;
       const area = tileW * tileH;
       const overflow = Math.max(0, gridH - H);
-      // Prefer fits (overflow == 0) with max area; otherwise prefer smallest overflow then max area
+      const score = area - penalty * Math.abs(rows - cols) - penalty2 * (rows * cols - n);
+      // Prefer fits (overflow == 0) with max score; otherwise prefer smallest overflow then max score
       const fits = overflow <= 0;
       if (fits) {
-        if (area > best.area || (area === best.area && cols > best.cols)) {
-          best = {cols, area, overflow};
+        if (score > best.score || (score === best.score && cols > best.cols)) {
+          best = {cols, score, overflow};
         }
-      } else {
-        
       }
     }
-    if (best.area >= 0) return best.cols;
+    if (best.score > -Infinity) return best.cols;
     // If no fit found (very small H), choose columns that minimize overflow
-    let minOverflow = Infinity, bestCols = 1, bestArea = -1;
+    let minOverflow = Infinity, bestCols = 1, bestScore = -Infinity;
     for (let cols = 1; cols <= n; cols++) {
       const rows = Math.ceil(n / cols);
       const totalGapW = gap * (cols - 1);
@@ -767,8 +768,9 @@ function openMatrix() {
       const gridH = rows * tileH + totalGapH;
       const overflow = Math.max(0, gridH - H);
       const area = tileW * tileH;
-      if (overflow < minOverflow || (overflow === minOverflow && area > bestArea)) {
-        minOverflow = overflow; bestArea = area; bestCols = cols;
+      const score = area - penalty * Math.abs(rows - cols) - penalty2 * (rows * cols - n);
+      if (overflow < minOverflow || (overflow === minOverflow && score > bestScore)) {
+        minOverflow = overflow; bestScore = score; bestCols = cols;
       }
     }
     return bestCols;
