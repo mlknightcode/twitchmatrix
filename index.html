@@ -790,12 +790,15 @@ function openMatrix() {
 
     // Special mosaics for specific counts
     if (n === 5) {
-      matrixBody.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
-      matrixBody.style.gridTemplateRows = 'repeat(2, minmax(0, 1fr))';
-      if (tiles[0]) {
-        tiles[0].style.gridColumn = 'span 2';
-        tiles[0].style.gridRow = 'span 2';
-      }
+      // Balanced 6×2 mosaic for five streams
+      matrixBody.style.gridTemplateColumns = 'repeat(6, minmax(0, 1fr))';
+      matrixBody.style.gridTemplateRows    = 'repeat(2, minmax(0, 1fr))';
+
+      if (tiles[0]) tiles[0].style.gridColumn = 'span 3';
+      if (tiles[1]) tiles[1].style.gridColumn = 'span 3';
+      if (tiles[2]) tiles[2].style.gridColumn = 'span 2';
+      if (tiles[3]) tiles[3].style.gridColumn = 'span 2';
+      if (tiles[4]) tiles[4].style.gridColumn = 'span 2';
       return;
     }
 
