@@ -734,10 +734,8 @@ function openMatrix() {
   });
 
   function optimalCols(n, W, H, gap) {
-    // Try all column counts 1..n; pick best that fits vertically and maximizes score
-    const penalty = 1000;
-    const penalty2 = 10000;
-    let best = {cols: 1, score: -Infinity, overflow: Infinity};
+    // Try all column counts 1..n; pick best that fits vertically and maximizes tile area
+    let best = {cols: 1, area: -1, overflow: Infinity};
     for (let cols = 1; cols <= n; cols++) {
       const rows = Math.ceil(n / cols);
       const totalGapW = gap * (cols - 1);
@@ -747,18 +745,19 @@ function openMatrix() {
       const gridH = rows * tileH + totalGapH;
       const area = tileW * tileH;
       const overflow = Math.max(0, gridH - H);
-      const score = area - penalty * Math.abs(rows - cols) - penalty2 * (rows * cols - n);
-      // Prefer fits (overflow == 0) with max score; otherwise prefer smallest overflow then max score
+      // Prefer fits (overflow == 0) with max area; otherwise prefer smallest overflow then max area
       const fits = overflow <= 0;
       if (fits) {
-        if (score > best.score || (score === best.score && cols > best.cols)) {
-          best = {cols, score, overflow};
+        if (area > best.area || (area === best.area && cols > best.cols)) {
+          best = {cols, area, overflow};
         }
+      } else {
+        
       }
     }
-    if (best.score > -Infinity) return best.cols;
+    if (best.area >= 0) return best.cols;
     // If no fit found (very small H), choose columns that minimize overflow
-    let minOverflow = Infinity, bestCols = 1, bestScore = -Infinity;
+    let minOverflow = Infinity, bestCols = 1, bestArea = -1;
     for (let cols = 1; cols <= n; cols++) {
       const rows = Math.ceil(n / cols);
       const totalGapW = gap * (cols - 1);
@@ -768,9 +767,8 @@ function openMatrix() {
       const gridH = rows * tileH + totalGapH;
       const overflow = Math.max(0, gridH - H);
       const area = tileW * tileH;
-      const score = area - penalty * Math.abs(rows - cols) - penalty2 * (rows * cols - n);
-      if (overflow < minOverflow || (overflow === minOverflow && score > bestScore)) {
-        minOverflow = overflow; bestScore = score; bestCols = cols;
+      if (overflow < minOverflow || (overflow === minOverflow && area > bestArea)) {
+        minOverflow = overflow; bestArea = area; bestCols = cols;
       }
     }
     return bestCols;
@@ -778,38 +776,6 @@ function openMatrix() {
 
   function applyLayout() {
     const n = Math.max(1, lastLive.length);
-    const tiles = matrixBody.children;
-
-    // Reset any previous explicit placement
-    Array.from(tiles).forEach(t => {
-      t.style.gridColumn = '';
-      t.style.gridRow = '';
-    });
-    matrixBody.style.gridTemplateColumns = '';
-    matrixBody.style.gridTemplateRows = '';
-
-    // Special mosaics for specific counts
-    if (n === 5) {
-      matrixBody.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
-      matrixBody.style.gridTemplateRows = 'repeat(2, minmax(0, 1fr))';
-      if (tiles[0]) {
-        tiles[0].style.gridColumn = 'span 2';
-        tiles[0].style.gridRow = 'span 2';
-      }
-      return;
-    }
-
-    if (n === 7) {
-      matrixBody.style.gridTemplateColumns = 'repeat(5, minmax(0, 1fr))';
-      matrixBody.style.gridTemplateRows = 'repeat(2, minmax(0, 1fr))';
-      if (tiles[0]) {
-        tiles[0].style.gridColumn = 'span 2';
-        tiles[0].style.gridRow = 'span 2';
-      }
-      return;
-    }
-
-    // Default responsive layout
     const gap = parseFloat(getComputedStyle(matrixBody).gap || "8");
     const rect = matrixBody.getBoundingClientRect();
     const cols = optimalCols(n, rect.width, rect.height, gap || 8);
