@@ -318,7 +318,6 @@ function parseTierText(text){
   const parsed = { tier1: [], tier2: [], tier3: [], tier4: [] };
   let currentTier = null;
   for(const rawLine of text.split(/\r?\n/)){
-/)){
     const line = rawLine.trim();
     if(!line) continue;
     const header = line.match(/^\[(tier[1-4])\]$/);
