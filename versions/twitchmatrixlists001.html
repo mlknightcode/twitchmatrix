@@ -317,7 +317,7 @@ let tiers = [tier1, tier2, tier3, tier4, tier5, tier6];
 function parseTierText(text){
   const parsed = { tier1: [], tier2: [], tier3: [], tier4: [] };
   let currentTier = null;
-  for(const rawLine of text.split(/?
+  for(const rawLine of text.split(/\r?\n/)){
 /)){
     const line = rawLine.trim();
     if(!line) continue;
