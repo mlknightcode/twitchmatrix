@@ -26,6 +26,7 @@ ninthchild
 dinomitetwins
 kumamonster
 gogoborgor
+hitch
 sarahbridgewater
 therealshookon3
 4amlaundry
@@ -51,6 +52,7 @@ alison_ace
 noraexplorer
 benjamool
 arrav
+maimaittv
 nessalpaca
 hello_kiko
 ibabyrainbow
@@ -68,11 +70,6 @@ lychee
 kiwhiskey
 lizzy_senrose
 cherlosthome
-fuslie
-hitch
-rellik
-yubababoo
-soleastellaa
 ridetheline
 poultry_motion
 fido_tw
@@ -105,9 +102,12 @@ kydeanderic
 botezlive
 danioskam
 crunk_muffin
+fuslie
+rellik
+yubababoo
+soleastellaa
 
 [tier4]
-maimaittv
 mewmelodys
 barktok
 crack_eggs
