@@ -60,6 +60,8 @@ hello_kiko
 peeguutv
 thecranecouple
 magicallyconsumed
+fido_tw
+stephaniequatro
 exbc
 ibabyrainbow
 hippiefix
@@ -69,25 +71,20 @@ bonnie
 emiru
 cinna
 clararline
+lychee
+kiwhiskey
 melibela
 classic_christine
 wasabiicat
-lychee
-kiwhiskey
 manukiemi
 lizzy_senrose
 cherlosthome
-sahranisworld
-ridetheline
-poultry_motion
-fido_tw
-d3nduro
-stephaniequatro
 
 [tier3]
 cybersteffie
 onigiri
 foxiekt
+dinah
 mhyochi
 jaystreazy
 dskoopa
@@ -100,6 +97,8 @@ dizzykitten
 donutkingtv
 terrybarentsen
 sahranisworld
+ridetheline
+poultry_motion
 miki_tokyo
 claraatwork
 mrpol
@@ -115,6 +114,7 @@ fuslie
 rellik
 yubababoo
 soleastellaa
+d3nduro
 
 [tier4]
 mewmelodys
