@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Twitch Matrix Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --accent:#9146FF; --bg:#1d1d1f; --panel:#19191b; --border:#313139; --muted:#bdbdbf; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: var(--bg); color: #f5f5f7; margin:0; padding:20px; font-size:15px; }
+    .container { display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; }
+    h1 { margin:4px 0 0; font-size:21px; }
+
+    .status { margin-top:6px; color: var(--muted); font-size:14px; min-height:20px; }
+    .picked { margin-top:2px; color: #e6e6e8; font-size:14px; min-height:18px; }
+
+    /* Controls */
+    .controls { width:100%; max-width:1100px; display:flex; flex-direction:column; gap:10px; margin-top:6px; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; }
+
+    .field { display:flex; align-items:center; gap:6px; font-size:13px; }
+    .stepper { display:inline-flex; align-items:center; gap:6px; }
+    .stepper input[type="number"]{
+      width:56px; height:36px; padding:4px 6px; border-radius:9px; border:1px solid var(--border);
+      background: var(--panel); color:#f5f5f7; text-align:center; font-size:14px;
+    }
+    .step-btn{ height:36px; min-width:36px; padding:0 8px; font-size:15px; font-weight:700; border-radius:9px;
+      border:1px solid var(--border); background:#2b2b31; color:#f5f5f7; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+    .step-btn:hover{ filter:brightness(1.08); }
+    .capsule{ display:inline-flex; align-items:center; gap:6px; }
+
+    /* Primary buttons */
+    .btn{ height:40px; min-width:150px; padding:0 16px; font-size:15px; border:none; border-radius:10px; cursor:pointer;
+      display:inline-flex; align-items:center; justify-content:center; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+    .btn.primary{ background:var(--accent); color:white; }
+    .btn.secondary{ background:#2f2f35; color:#f5f5f7; border:1px solid var(--border); }
+    .btn:disabled{ background:#555; cursor:not-allowed; }
+
+    /* Grid: two rows of three columns */
+    .grid { display:grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap:18px; margin-top:14px; align-items:start; }
+    .tier { display:flex; flex-direction:column; align-items:stretch; }
+    .tier h3 { text-align:left; margin:0 0 6px; font-size:14px; color:#d6d6d8; }
+    .placeholder{ color:#9e9ea1; font-style:italic; padding:2px 2px; }
+
+    .streamer{ display:flex; align-items:center; gap:4px; margin:2px 0; padding:1px 2px; border-radius:8px; }
+    .online{ color:#3dfb55; }
+    .offline{ color:#ff6b6b; }
+    .unknown{ color:#9e9ea1; }
+    .working{ color:#9cf; position:relative; padding-left:14px; }
+    .working::before{ content:""; position:absolute; left:0; top:50%; width:10px; height:10px; margin-top:-5px;
+      border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin{ to{ transform:rotate(360deg);} }
+
+    .pin-btn,.black-btn{ border:1px solid var(--border); background:#222; color:#f5f5f7; cursor:pointer; font-size:14px;
+      padding:3px 7px; border-radius:8px; line-height:1; font-weight:700; height:26px; min-width:30px; display:inline-flex; align-items:center; justify-content:center; }
+    .pin-btn.active{ background:#19351a; color:#d6ff7a; border-color:#2f5c30; }
+    .black-btn.active{ background:#3a1f2f; color:#ff9bd5; border-color:#6a2a4d; }
+
+    .pick-star{ width:10px; text-align:center; color:#ffd54a; font-weight:700; opacity:0; transition:opacity .15s ease; }
+    .streamer.selected .pick-star{ opacity:1; }
+
+    .links { display:flex; gap:10px; justify-content:center; }
+    .tiny { font-size:12px; color:#bdbdbf; }
+
+    /* Vertical steppers 3-row × 6-col */
+    .limits-vertical {
+      display:grid;
+      grid-template-columns: repeat(6, minmax(56px, 1fr));
+      grid-template-rows: auto auto auto;
+      gap:6px;
+      align-items:stretch;
+      justify-items:stretch;
+      max-width:1100px;
+      margin-inline:auto;
+    }
+    .limits-vertical .tier-label {
+      grid-column: 1 / -1;
+      text-align:left;
+      color:#d6d6d8;
+      font-size:13px;
+      margin:4px 0;
+      opacity:.85;
+    }
+    .limits-vertical .vbtn,
+    .limits-vertical .vinput {
+      width:100%;
+    }
+    .limits-vertical .vinput input[type="number"]{
+      width:100%;
+    }
+
+    /* --- Preview overlay modal (non-invasive) --- */
+    .preview-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.64);
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    .preview-modal {
+      background: #111;
+      width: min(80vw, 1200px);
+      height: min(80vh, 800px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 12px 48px rgba(0,0,0,.6);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .preview-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border);
+    }
+    .preview-title { font-weight: 600; color: #eee; }
+    .preview-close { cursor: pointer; font-size: 20px; line-height: 1; background: none; border: 0; color: #ddd; }
+    .preview-close:hover { color: #fff; }
+    .preview-body { padding: 12px; overflow: auto; }
+
+    .preview-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+    .preview-card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel); }
+    .preview-card img { display: block; width: 100%; height: auto; }
+    .preview-meta { padding: 8px; font-size: 13px; color: #e6e6e8; }
+
+    /* --- Matrix overlay (full-screen) --- */
+    .matrix-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.9);
+      display: none;
+      align-items: stretch; justify-content: stretch;
+      z-index: 10000;
+    }
+    .matrix-modal {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      background: #000;
+    }
+    .matrix-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 12px; background:#0a0a0a; border-bottom:1px solid #111;
+      color:#ddd;
+    }
+    .matrix-close { cursor:pointer; font-size:20px; line-height:1; background:none; border:0; color:#ddd; }
+    .matrix-close:hover { color:#fff; }
+    .matrix-body {
+      flex:1;
+      overflow:auto;
+      padding:8px;
+      display:grid;
+      gap:8px;
+      background:#000;
+    }
+    .tile {
+      position:relative;
+      background:#111;
+      border-radius:8px;
+      overflow:hidden;
+      aspect-ratio: 16 / 9;
+    }
+    .tile iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+
+    .fade-hint {
+      position:absolute; left:8px; top:8px; padding:2px 6px; font-size:12px;
+      background:rgba(0,0,0,.55); color:#eee; border-radius:4px;
+      opacity:1; transition: opacity .8s ease-in;
+    }
+    .fade-hint.hide { opacity:0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Twitch Matrix Generator</h1>
+    <div class="status" id="status">Idle. Grid is ready. Click ‘Retrieve’ to fetch categories and statuses.</div>
+    <div class="picked" id="pickedNames"></div>
+
+    <div class="controls">
+      <!-- Row 1: Batch & Size -->
+      <div class="row">
+        <div class="field">Batch
+          <div class="stepper">
+            <button class="step-btn up" data-target="inputBatch">▲</button>
+            <input type="number" id="inputBatch" min="1" max="200" step="1" value="20" aria-label="Batch size">
+            <button class="step-btn down" data-target="inputBatch">▼</button>
+          </div>
+        </div>
+        <div class="field">Size
+          <div class="stepper">
+            <button class="step-btn up" data-target="inputSize">▲</button>
+            <input type="number" id="inputSize" min="1" max="12" step="1" value="6" aria-label="Grid size">
+            <button class="step-btn down" data-target="inputSize">▼</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2–4: Vertical limits (↑ / inputs / ↓) -->
+      <div class="limits-vertical" id="limitsGrid">
+        <div class="tier-label">Tier limits (T1–T6)</div>
+        <!-- Up buttons -->
+        <button class="step-btn vbtn up" data-target="lim1">▲</button>
+        <button class="step-btn vbtn up" data-target="lim2">▲</button>
+        <button class="step-btn vbtn up" data-target="lim3">▲</button>
+        <button class="step-btn vbtn up" data-target="lim4">▲</button>
+        <button class="step-btn vbtn up" data-target="lim5">▲</button>
+        <button class="step-btn vbtn up" data-target="lim6">▲</button>
+        <!-- Inputs -->
+        <div class="vinput"><input type="number" id="lim1" min="0" max="99" step="1" value="3" aria-label="Tier 1 limit"></div>
+        <div class="vinput"><input type="number" id="lim2" min="0" max="99" step="1" value="1" aria-label="Tier 2 limit"></div>
+        <div class="vinput"><input type="number" id="lim3" min="0" max="99" step="1" value="1" aria-label="Tier 3 limit"></div>
+        <div class="vinput"><input type="number" id="lim4" min="0" max="99" step="1" value="1" aria-label="Tier 4 limit"></div>
+        <div class="vinput"><input type="number" id="lim5" min="0" max="99" step="1" value="0" aria-label="Tier 5 limit"></div>
+        <div class="vinput"><input type="number" id="lim6" min="0" max="99" step="1" value="0" aria-label="Tier 6 limit"></div>
+        <!-- Down buttons -->
+        <button class="step-btn vbtn down" data-target="lim1">▼</button>
+        <button class="step-btn vbtn down" data-target="lim2">▼</button>
+        <button class="step-btn vbtn down" data-target="lim3">▼</button>
+        <button class="step-btn vbtn down" data-target="lim4">▼</button>
+        <button class="step-btn vbtn down" data-target="lim5">▼</button>
+        <button class="step-btn vbtn down" data-target="lim6">▼</button>
+      </div>
+
+      <!-- Row 5: Random toggles -->
+      <div class="row" id="randomRow">
+        <label><input type="checkbox" id="rand1" checked> Random T1</label>
+        <label><input type="checkbox" id="rand2" checked> Random T2</label>
+        <label><input type="checkbox" id="rand3" checked> Random T3</label>
+        <label><input type="checkbox" id="rand4" checked> Random T4</label>
+        <label><input type="checkbox" id="rand5" checked> Random T5</label>
+        <label><input type="checkbox" id="rand6" checked> Random T6</label>
+      </div>
+
+      <!-- Row 6: Buttons -->
+      <div class="row">
+        <button class="btn secondary" id="retrieveBtn" title="Fetch categories and statuses for all names">Retrieve</button>
+        <button class="btn primary" id="generateBtn" title="Pick from the cached results only">Generate</button>
+        <button class="btn secondary" id="matrixBtn" title="Open embedded matrix (from last Generate)" disabled>Matrix</button>
+      </div>
+
+      <!-- Row 7: Links (legacy) -->
+      <div class="row links">
+        <button class="btn secondary" disabled id="openLink">Open TwitchTheater</button>
+        <button class="btn secondary" disabled id="openMulti">Open MultiTwitch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid: T1–T3 on first row, T4–T6 second row (CSS grid handles layout) -->
+  <div class="grid" id="gridContainer"></div>
+
+  <!-- Preview overlay (reused for name/tier previews) -->
+  <div class="preview-backdrop" id="previewBackdrop">
+    <div class="preview-modal" role="dialog" aria-modal="true" aria-label="Preview">
+      <div class="preview-header">
+        <div class="preview-title"></div>
+        <button class="preview-close" aria-label="Close">×</button>
+      </div>
+      <div class="preview-body"></div>
+    </div>
+  </div>
+
+  <!-- Matrix overlay (full-screen) -->
+  <div class="matrix-backdrop" id="matrixBackdrop">
+    <div class="matrix-modal">
+      <div class="matrix-header">
+        <div class="preview-title">Embedded Matrix</div>
+        <button class="matrix-close" aria-label="Close">×</button>
+      </div>
+      <div class="matrix-body" id="matrixBody"></div>
+    </div>
+  </div>
+
+<script>
+/* ---------- Static Tiers 1..4 ---------- */
+const tier1 = ["jinnytty","extraemily","bonnie","qtcinderella","emiru","knut","onigiri","mhyochi","jaystreazy","waterlynn","jakenbakelive","lo3tus","rennsz","hachubby","crispyjenny","jellyhaeni","hazunats","aprylanonymous","potentialbliss","hippiefix","ibabyrainbow","magicallyconsumed","recharg_ing","chloe__irl","kumamonster","dinomitetwins","nezst","jonsf","daveezz","studytme","jengo_m","ninthchild","bawnsai","ira_aba","justketh"];
+const tier2 = ["yoshimyan","mizkif","juliakins","lizzy_senrose","cherlosthome","hello_kiko","fuslie","hitch","sarahbridgewater","therealshookon3","4amlaundry","nessalpaca","rellik","clararline","melibela","arrav","cooksux","meesterkeem","soleastellaa","globiklive","manukiemi","misterarther","cinna","robcdee","ridetheline","poultry_motion","fido_tw","d3nduro","stephaniequatro","foxiekt","classic_christine","wasabiicat","lychee","kiwhiskey"];
+const tier3 = ["dskoopa","voyagesdiary","tiffanobi","gaijin1up","nomadicgaijin","yubababoo","thecranecouple","cybersteffie","gogoborgor","terrybarentsen","sahranisworld","miki_tokyo","claraatwork","mrpol","barktok","missmikkaa","nmplol","ppim","zumi","kydeanderic","botezlive","danioskam","crunk_muffin","architecturetv"];
+const tier4 = ["maimaittv","wolfsbanee","soweq","tymwits","jinritv","relit20","awkwards_travel","crack_eggs","miekii","0greprincess","bottlehead","yurijoa","igumdrop","henukei","liniwalks","cecehustle","tokidokitraveller","w3cj","arianakatana","slipstreamjc","retrogaijin","dizzykitten","donutkingtv","zep_aki","agctv","hapipy","eddy2travel","mewmelodys"];
+
+/* Dynamic (populated on Retrieve) */
+let tier5 = []; // IRL / Travel & Outdoors
+let tier6 = []; // Just Chatting
+let tiers = [tier1, tier2, tier3, tier4, tier5, tier6];
+
+/* ---------- GraphQL ---------- */
+const clientId = "kimne78kx3ncx6brgo4mv6wki5h1ko";
+const query = `query($login: String!) {
+  user(login: $login) {
+    stream { id title viewersCount game { name } }
+  }
+}`;
+
+/* Category top query */
+const categoryTopQuery = `query CategoryTop($name: String!, $limit: Int!) {
+  game(name: $name) {
+    id
+    name
+    streams(first: $limit, options: { sort: VIEWER_COUNT }) {
+      edges { node { viewersCount broadcaster { login } } }
+    }
+  }
+}`;
+
+/* ---------- State ---------- */
+const statusEl = document.getElementById("status");
+const pickedEl = document.getElementById("pickedNames");
+const openBtn = document.getElementById("openLink");
+const multiBtn = document.getElementById("openMulti");
+const matrixBtn = document.getElementById("matrixBtn");
+let finalURL = "", multiURL = "";
+let lastLive = []; // store last generated live list
+const resultsCache = new Map(); // login -> { isLive, category, title, viewers }
+let sessionPins = new Set();
+let sessionBlacklist = new Set();
+
+/* ---------- Persistence ---------- */
+const LS_KEY = "twitchcategories_settings_v2";
+function loadSettings(){ try{const r=localStorage.getItem(LS_KEY); return r?JSON.parse(r):null;}catch{return null;} }
+function saveSettings(s){ localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+function getSettings(){
+  const defaults={ batch:20, size:6, limits:[3,1,1,1,0,0], random:[true,true,true,true,true,true] };
+  const saved=loadSettings();
+  return saved?{
+    batch: saved.batch ?? defaults.batch,
+    size: saved.size ?? defaults.size,
+    limits: Array.isArray(saved.limits)? saved.limits.concat([0,0,0,0,0,0]).slice(0,6) : defaults.limits,
+    random: Array.isArray(saved.random)? saved.random.concat([true,true,true,true,true,true]).slice(0,6) : defaults.random
+  }:defaults;
+}
+
+/* ---------- Helpers ---------- */
+function abbreviateCategory(cat){
+  if(!cat) return "";
+  const t = (cat+"").trim(); if(t.length<=4) return t;
+  return t.split(/\s+/).slice(0,3).map(w=>w.slice(0,3)).join("");
+}
+function shuffledCopy(arr){ return [...arr].map(v=>({v, r:Math.random()})).sort((a,b)=>a.r-b.r).map(x=>x.v); }
+function orderedTierNames(i, pinned, blacklist, tierRandomize){
+  const tier=tiers[i]||[];
+  const pinsFirst=tier.filter(n=>pinned.has(n));
+  const rest=tier.filter(n=>!pinned.has(n));
+  const ordered = tierRandomize[i] ? [...pinsFirst, ...shuffledCopy(rest)] : [...pinsFirst, ...rest];
+  return ordered.filter(n=>!blacklist.has(n));
+}
+function getBatchSize(){
+  const n = parseInt(document.getElementById("inputBatch")?.value || "20", 10);
+  return Number.isFinite(n) && n>0 ? n : 20;
+}
+
+/* ---------- Grid ---------- */
+function buildStreamerRow(name){
+  const row=document.createElement("div"); row.className="streamer";
+  const star=document.createElement("span"); star.className="pick-star"; star.textContent="*";
+
+  const pinBtn=document.createElement("button"); pinBtn.className="pin-btn"; pinBtn.innerText="✔"; pinBtn.title="Pin (prefer)"; pinBtn.dataset.name=name;
+  pinBtn.onclick=()=>{const n=name;
+    if(sessionPins.has(n)){ sessionPins.delete(n); pinBtn.classList.remove("active"); }
+    else { sessionPins.add(n); pinBtn.classList.add("active"); sessionBlacklist.delete(n); blackBtn.classList.remove("active"); }
+  };
+
+  const blackBtn=document.createElement("button"); blackBtn.className="black-btn"; blackBtn.innerText="✖"; blackBtn.title="Blacklist (exclude)"; blackBtn.dataset.name=name;
+  blackBtn.onclick=()=>{const n=name;
+    if(sessionBlacklist.has(n)){ sessionBlacklist.delete(n); blackBtn.classList.remove("active"); }
+    else { sessionBlacklist.add(n); blackBtn.classList.add("active"); sessionPins.delete(n); pinBtn.classList.remove("active"); }
+  };
+
+  if(sessionPins.has(name)) pinBtn.classList.add("active");
+  if(sessionBlacklist.has(name)) blackBtn.classList.add("active");
+
+  const span=document.createElement("span"); span.id=`status-${name}`; span.textContent=name; span.className="unknown";
+  row.append(star, pinBtn, blackBtn, span);
+  return row;
+}
+function setupGrid(){
+  const grid=document.getElementById("gridContainer"); grid.innerHTML="";
+  const labels=["Tier 1","Tier 2","Tier 3","Tier 4","Tier 5 IRL","Tier 6 Just Chatting"];
+  for(let i=0;i<6;i++){
+    const col=document.createElement("div"); col.className="tier";
+    const h=document.createElement("h3"); h.textContent=labels[i]; col.appendChild(h);
+    const list=tiers[i]||[];
+    if(list.length===0 && i>=4){
+      const ph=document.createElement("div"); ph.className="placeholder"; ph.textContent="— will populate on Retrieve —"; col.appendChild(ph);
+    } else {
+      list.forEach(n=>col.appendChild(buildStreamerRow(n)));
+    }
+    grid.appendChild(col);
+  }
+}
+function replaceTier(i, names){
+  tiers[i]=names;
+  const grid=document.getElementById("gridContainer");
+  const col=grid.children[i]; if(!col) return;
+  while(col.children.length>1) col.removeChild(col.lastChild);
+  if(!names || !names.length){
+    const ph=document.createElement("div"); ph.className="placeholder"; ph.textContent="— will populate on Retrieve —"; col.appendChild(ph);
+  } else { names.forEach(n=>col.appendChild(buildStreamerRow(n))); }
+}
+
+/* ---------- Paint / Selection ---------- */
+function setWorking(names, isWorking){
+  for(const name of names){
+    const el=document.getElementById(`status-${name}`); if(!el) continue;
+    el.classList.toggle("working", isWorking);
+    el.setAttribute("aria-busy", isWorking ? "true":"false");
+    if(isWorking){ el.classList.remove("online","offline","unknown"); el.textContent = `${name} (checking…)`; }
+  }
+}
+function markError(names, note="(error)"){
+  for(const name of names){
+    const el=document.getElementById(`status-${name}`); if(!el) continue;
+    el.classList.remove("working","online","offline"); el.classList.add("unknown"); el.setAttribute("aria-busy","false");
+    el.textContent = `${name} ${note}`;
+  }
+}
+function paintLabel(name, r){
+  const el=document.getElementById(`status-${name}`);
+  if(!el) return;
+  el.classList.remove("working","online","offline","unknown");
+  if(!r){ el.classList.add("unknown"); el.textContent=name; return; }
+  if(r.isLive){ el.classList.add("online"); el.textContent = r.category ? `${name} (${abbreviateCategory(r.category)})` : name; }
+  else { el.classList.add("offline"); el.textContent = name; }
+}
+function setSelected(name, isSel){
+  const el=document.getElementById(`status-${name}`); if(!el) return;
+  const row=el.closest(".streamer"); if(!row) return;
+  row.classList.toggle("selected", isSel);
+}
+function clearSelected(){ document.querySelectorAll(".streamer.selected").forEach(el=>el.classList.remove("selected")); }
+
+/* ---------- Networking ---------- */
+async function fetchBatch(names){
+  if(!names.length) return [];
+  const ops = names.map(login => ({ operationName: null, query, variables: { login } }));
+  const res = await fetch("https://gql.twitch.tv/gql", {
+    method:"POST",
+    headers:{ "Client-ID":clientId, "Content-Type":"application/json" },
+    body: JSON.stringify(ops)
+  });
+  if(!res.ok){ throw new Error("HTTP "+res.status); }
+  const data = await res.json();
+  return data.map(d=>{
+    const stream = d?.data?.user?.stream;
+    return {
+      isLive: !!stream,
+      category: stream?.game?.name || null,
+      title: stream?.title || null,
+      viewers: (typeof stream?.viewersCount === 'number') ? stream.viewersCount : null
+    };
+  });
+}
+
+/* Category helpers */
+async function gqlSingle(op){
+  const res = await fetch("https://gql.twitch.tv/gql", {
+    method:"POST", headers:{ "Client-ID":clientId, "Content-Type":"application/json" },
+    body: JSON.stringify([op])
+  });
+  if(!res.ok) throw new Error("HTTP "+res.status);
+  return res.json();
+}
+async function fetchCategoryTop(catName, limit){
+  const tryNames = catName==="IRL" ? ["IRL","Travel & Outdoors"] : [catName];
+  for(const nm of tryNames){
+    try{
+      const data = await gqlSingle({ operationName:"CategoryTop", query:categoryTopQuery, variables:{ name:nm, limit } });
+      const edges = data?.[0]?.data?.game?.streams?.edges || [];
+      const logins = edges.map(e=>e?.node?.broadcaster?.login).filter(Boolean);
+      if(logins.length) return logins;
+    }catch(e){ /* try next */ }
+  }
+  return [];
+}
+
+/* ---------- Phase 1: Retrieve ---------- */
+async function retrieveAll(){
+  try{
+    statusEl.textContent = "Retrieving categories (top 20) and statuses…";
+    pickedEl.textContent = "";
+
+    // 1) Get category lists in parallel
+    let [irl, jc] = await Promise.all([ fetchCategoryTop("IRL", 20), fetchCategoryTop("Just Chatting", 20) ]);
+
+    // 2) De-dup against T1–T4 and between T5/T6
+    const existing = new Set([ ...tier1, ...tier2, ...tier3, ...tier4 ]);
+    irl = irl.filter(n => !existing.has(n));
+    irl.forEach(n => existing.add(n));
+    jc  = jc.filter(n => !existing.has(n));
+
+    // Replace Tier 5/6
+    replaceTier(4, irl);
+    replaceTier(5, jc);
+
+    // 3) Re-apply pins/blacklist only if name is still visible
+    const prevPins=new Set(sessionPins), prevBlack=new Set(sessionBlacklist);
+    sessionPins = new Set(); sessionBlacklist = new Set();
+    const visible = new Set(tiers.flat());
+    prevPins.forEach(n=>{ if(visible.has(n)) sessionPins.add(n); });
+    prevBlack.forEach(n=>{ if(visible.has(n)) sessionBlacklist.add(n); });
+    // Sync button styles
+    document.querySelectorAll(".streamer").forEach(row=>{
+      const name=row.querySelector(".pin-btn")?.dataset?.name; if(!name) return;
+      if(sessionPins.has(name)) row.querySelector(".pin-btn").classList.add("active");
+      if(sessionBlacklist.has(name)) row.querySelector(".black-btn").classList.add("active");
+    });
+
+    // 4) Batched status checks for ALL visible names
+    const allNames=[...new Set(tiers.flat())];
+    const batchSize=getBatchSize();
+    let processed=0;
+    for(let i=0; i<allNames.length; ){
+      const chunk=allNames.slice(i, i+batchSize); i+=batchSize;
+      setWorking(chunk, true);
+      try{
+        const fetched = await fetchBatch(chunk);
+        fetched.forEach((r, idx)=>{
+          const name = chunk[idx];
+          resultsCache.set(name, r);
+          paintLabel(name, r);
+        });
+        processed += chunk.length;
+        statusEl.textContent = `Retrieved ${processed}/${allNames.length}…`;
+      }catch(e){
+        console.error("Batch error", e);
+        markError(chunk);
+      }finally{
+        setWorking(chunk, false);
+      }
+    }
+    statusEl.textContent = "Retrieve complete. Click Generate to pick from cache.";
+  }catch(e){
+    console.error(e);
+    statusEl.textContent = "Retrieve failed (categories or status). See console for details.";
+  }
+}
+
+/* ---------- Phase 2: Generate ---------- */
+function readLimits(){ return [1,2,3,4,5,6].map(i=>parseInt(document.getElementById("lim"+i).value||"0",10) || 0); }
+function readRandoms(){ return [1,2,3,4,5,6].map(i=>document.getElementById("rand"+i).checked); }
+
+function generateFromCache(){
+  clearSelected(); pickedEl.textContent = "";
+  const size = parseInt(document.getElementById("inputSize").value||"6",10);
+  const tierLimits = readLimits();
+  const tierRandomize = readRandoms();
+  const pinned = new Set(sessionPins);
+  const blacklist = new Set(sessionBlacklist);
+
+  if(!resultsCache.size){ statusEl.textContent="No cached statuses. Click ‘Retrieve’ first."; openBtn.disabled=true; multiBtn.disabled=true; matrixBtn.disabled=true; lastLive=[]; return; }
+
+  // Build ordered lists per tier, filtered & randomized
+  const perTier=[0,1,2,3,4,5].map(i => orderedTierNames(i, pinned, blacklist, tierRandomize));
+
+  const live=[]; const usedTiers=[]; const counts=[0,0,0,0,0,0];
+
+  // Pass 1: respect per-tier caps
+  for(let t=0; t<perTier.length && live.length<size; t++){
+    const cap=tierLimits[t]; if(cap<=0) continue;
+    for(const name of perTier[t]){
+      if(live.length>=size || counts[t]>=cap) break;
+      const r=resultsCache.get(name);
+      if(r?.isLive){ live.push(name); counts[t]++; setSelected(name,true); if(!usedTiers.includes(`Tier ${t+1}`)) usedTiers.push(`Tier ${t+1}`); }
+    }
+  }
+  // Pass 2: backfill ignoring caps
+  if(live.length<size){
+    for(let t=0; t<perTier.length && live.length<size; t++){
+      for(const name of perTier[t]){
+        if(live.includes(name)) continue;
+        const r=resultsCache.get(name);
+        if(r?.isLive){ live.push(name); setSelected(name,true); if(!usedTiers.includes(`Tier ${t+1}`)) usedTiers.push(`Tier ${t+1}`); if(live.length>=size) break; }
+      }
+    }
+  }
+
+  if(live.length){
+    lastLive = live.slice();
+    finalURL=`https://twitchtheater.tv/${live.join("/")}`;
+    multiURL=`https://multitwitch.tv/${live.join("/")}`;
+    openBtn.disabled=false; multiBtn.disabled=false; matrixBtn.disabled=false;
+    statusEl.innerHTML = `<strong>Picked ${live.length}/${size}</strong> from: ${usedTiers.join(", ")}`;
+    pickedEl.textContent = live.join(", ");
+  } else {
+    statusEl.textContent = "No live streamers matched the rules. Adjust limits/random/pins.";
+    pickedEl.textContent=""; openBtn.disabled=true; multiBtn.disabled=true; matrixBtn.disabled=true; lastLive=[];
+  }
+}
+
+/* ---------- Steppers & Persistence ---------- */
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+function attachStepperHandlers(){
+  function adjust(input, dir){
+    const min=parseInt(input.min||"0",10), max=parseInt(input.max||"999",10), step=parseInt(input.step||"1",10);
+    const cur=parseInt(input.value||"0",10) || 0;
+    const next=clamp(cur + (dir>0?step:-step), min, max);
+    input.value=String(next);
+    input.dispatchEvent(new Event("change"));
+  }
+  document.querySelectorAll(".step-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id=btn.getAttribute("data-target");
+      const input=document.getElementById(id); if(!input) return;
+      const dir = btn.classList.contains("up") ? +1 : -1;
+      adjust(input, dir);
+    });
+  });
+  document.querySelectorAll('input[type="number"]').forEach(inp=>{
+    inp.addEventListener("keydown", (e)=>{
+      if(e.key==="ArrowUp" || e.key==="ArrowDown"){
+        const dir = e.key==="ArrowUp" ? +1 : -1;
+        const mult = e.shiftKey ? 5 : 1;
+        const min=parseInt(inp.min||"0",10), max=parseInt(inp.max||"999",10), step=parseInt(inp.step||"1",10)*mult;
+        const cur=parseInt(inp.value||"0",10) || 0;
+        inp.value = String(clamp(cur + dir*step, min, max));
+        e.preventDefault();
+        inp.dispatchEvent(new Event("change"));
+      }
+    });
+  });
+}
+function initPersistence(){
+  const s=getSettings();
+  document.getElementById("inputBatch").value=s.batch;
+  document.getElementById("inputSize").value=s.size;
+  ["lim1","lim2","lim3","lim4","lim5","lim6"].forEach((id,i)=>document.getElementById(id).value=s.limits[i]);
+  [1,2,3,4,5,6].forEach(i=>document.getElementById("rand"+i).checked=!!s.random[i-1]);
+  function persist(){
+    saveSettings({
+      batch: parseInt(document.getElementById("inputBatch").value||"20",10),
+      size: parseInt(document.getElementById("inputSize").value||"6",10),
+      limits: [1,2,3,4,5,6].map(i=>parseInt(document.getElementById("lim"+i).value||"0",10) || 0),
+      random: [1,2,3,4,5,6].map(i=>document.getElementById("rand"+i).checked)
+    });
+  }
+  document.querySelectorAll('#inputBatch,#inputSize,#lim1,#lim2,#lim3,#lim4,#lim5,#lim6').forEach(el=>el.addEventListener("change", persist));
+  [1,2,3,4,5,6].forEach(i=>document.getElementById("rand"+i).addEventListener("change", persist));
+}
+
+/* ---------- Preview Overlay (modal) ---------- */
+const previewBackdrop = document.getElementById('previewBackdrop');
+function openPreview({ title, nodes }) {
+  previewBackdrop.querySelector('.preview-title').textContent = title || '';
+  const body = previewBackdrop.querySelector('.preview-body');
+  body.innerHTML = '';
+  nodes.forEach(n => body.appendChild(n));
+  document.body.style.overflow = 'hidden';
+  previewBackdrop.style.display = 'flex';
+}
+function closePreview() {
+  previewBackdrop.style.display = 'none';
+  previewBackdrop.querySelector('.preview-body').innerHTML = '';
+  document.body.style.overflow = '';
+}
+previewBackdrop.addEventListener('click', (e) => { if (e.target === previewBackdrop) closePreview(); });
+previewBackdrop.querySelector('.preview-close').addEventListener('click', closePreview);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (matrixBackdrop.style.display==='flex') closeMatrix(); else closePreview(); } });
+
+/* Single-card builder (no extra fetch) */
+function makePreviewCard(name) {
+  const r = resultsCache.get(name) || {};
+  const card = document.createElement('div');
+  card.className = 'preview-card';
+
+  const img = document.createElement('img');
+  img.src = `https://static-cdn.jtvnw.net/previews-ttv/live_user_${name}-640x360.jpg`;
+
+  const meta = document.createElement('div');
+  meta.className = 'preview-meta';
+  const cat = r.category || '';
+  const viewers = (typeof r.viewers === 'number') ? ` — ${r.viewers.toLocaleString()} watching` : '';
+  const title = r.title || '(no title)';
+
+  meta.innerHTML = `
+    <div><strong>${name}</strong></div>
+    <div>${cat}${viewers}</div>
+    <div style="color:#bdbdbf">${title}</div>
+  `;
+
+  card.append(img, meta);
+  return card;
+}
+
+/* ---------- Matrix Overlay (embedded players) ---------- */
+const matrixBackdrop = document.getElementById('matrixBackdrop');
+const matrixBody = document.getElementById('matrixBody');
+function hostName(){ return window.location.hostname; }
+
+
+function openMatrix() {
+  if (!lastLive.length) return;
+  matrixBody.innerHTML = '';
+
+  const host = hostName();
+  if (!host) {
+    const warn = document.createElement('div');
+    warn.style.color = '#f55'; warn.style.fontSize='14px'; warn.style.padding='8px';
+    warn.textContent = 'Cannot embed Twitch on file://. Serve this page via HTTP(S).';
+    matrixBody.appendChild(warn);
+  }
+
+  // Build tiles once
+  lastLive.forEach(name => {
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+
+    const hint = document.createElement('div');
+    hint.className = 'fade-hint';
+    const r = resultsCache.get(name) || {};
+    const cat = r.category ? ` • ${r.category}` : '';
+    const v = (typeof r.viewers === 'number') ? ` • ${r.viewers.toLocaleString()} viewers` : '';
+    hint.textContent = `${name}${cat}${v}`;
+
+    const params = new URLSearchParams();
+    params.set('channel', name);
+    if (host) params.set('parent', host);
+    params.set('autoplay','true');
+    params.set('muted','true');
+    params.set('controls','false');
+
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://player.twitch.tv/?${params.toString()}`;
+    iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+
+    tile.append(iframe, hint);
+    matrixBody.appendChild(tile);
+
+    // fade the hint after 2.5s
+    setTimeout(()=> hint.classList.add('hide'), 2500);
+  });
+
+  function optimalCols(n, W, H, gap) {
+    // Try all column counts 1..n; pick best that fits vertically and maximizes tile area
+    let best = {cols: 1, area: -1, overflow: Infinity};
+    for (let cols = 1; cols <= n; cols++) {
+      const rows = Math.ceil(n / cols);
+      const totalGapW = gap * (cols - 1);
+      const totalGapH = gap * (rows - 1);
+      const tileW = Math.max(0, (W - totalGapW) / cols);
+      const tileH = tileW * 9 / 16; // 16:9 tiles
+      const gridH = rows * tileH + totalGapH;
+      const area = tileW * tileH;
+      const overflow = Math.max(0, gridH - H);
+      // Prefer fits (overflow == 0) with max area; otherwise prefer smallest overflow then max area
+      const fits = overflow <= 0;
+      if (fits) {
+        if (area > best.area || (area === best.area && cols > best.cols)) {
+          best = {cols, area, overflow};
+        }
+      } else {
+        
+      }
+    }
+    if (best.area >= 0) return best.cols;
+    // If no fit found (very small H), choose columns that minimize overflow
+    let minOverflow = Infinity, bestCols = 1, bestArea = -1;
+    for (let cols = 1; cols <= n; cols++) {
+      const rows = Math.ceil(n / cols);
+      const totalGapW = gap * (cols - 1);
+      const totalGapH = gap * (rows - 1);
+      const tileW = Math.max(0, (W - totalGapW) / cols);
+      const tileH = tileW * 9 / 16;
+      const gridH = rows * tileH + totalGapH;
+      const overflow = Math.max(0, gridH - H);
+      const area = tileW * tileH;
+      if (overflow < minOverflow || (overflow === minOverflow && area > bestArea)) {
+        minOverflow = overflow; bestArea = area; bestCols = cols;
+      }
+    }
+    return bestCols;
+  }
+
+  function applyLayout() {
+    const n = Math.max(1, lastLive.length);
+    const gap = parseFloat(getComputedStyle(matrixBody).gap || "8");
+    const rect = matrixBody.getBoundingClientRect();
+    const cols = optimalCols(n, rect.width, rect.height, gap || 8);
+    matrixBody.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  }
+
+  document.body.style.overflow = 'hidden';
+  matrixBackdrop.style.display = 'flex';
+  // Initial layout + responsive relayout
+  applyLayout();
+  window.addEventListener('resize', applyLayout, { passive: true });
+}
+
+function closeMatrix() {
+  matrixBackdrop.style.display = 'none';
+  matrixBody.innerHTML = '';
+  document.body.style.overflow = '';
+}
+matrixBackdrop.querySelector('.matrix-close').addEventListener('click', closeMatrix);
+matrixBackdrop.addEventListener('click', (e)=>{ if (e.target === matrixBackdrop) closeMatrix(); });
+
+/* ---------- Boot ---------- */
+document.addEventListener("DOMContentLoaded", ()=>{
+  setupGrid();
+  initPersistence();
+  attachStepperHandlers();
+  statusEl.textContent = "Idle. Grid is ready. Click ‘Retrieve’ to fetch categories and statuses.";
+  pickedEl.textContent = "";
+  document.getElementById("retrieveBtn").onclick = retrieveAll;
+  document.getElementById("generateBtn").onclick = generateFromCache;
+  matrixBtn.onclick = openMatrix;
+  openBtn.onclick = () => finalURL && window.open(finalURL, "_blank");
+  multiBtn.onclick = () => multiURL && window.open(multiURL, "_blank");
+
+  // === Preview interactions ===
+  const gridEl = document.getElementById("gridContainer");
+
+  // Click a live name -> single preview
+  gridEl.addEventListener("click", (e) => {
+    const label = e.target.closest('span[id^="status-"]');
+    if (!label) return;
+    const name = label.id.replace('status-','');
+    const r = resultsCache.get(name);
+    if (!r?.isLive) return;
+    openPreview({ title: name, nodes: [ makePreviewCard(name) ] });
+  });
+
+  // Click a tier header -> gallery of live names in that tier
+  gridEl.addEventListener("click", (e) => {
+    const header = e.target.closest('.tier > h3');
+    if (!header) return;
+    const col = header.parentElement;
+    const tierIndex = Array.prototype.indexOf.call(col.parentElement.children, col);
+    const names = (tiers[tierIndex] || []).filter(n => (resultsCache.get(n)?.isLive));
+    if (!names.length) return;
+    const grid = document.createElement('div');
+    grid.className = 'preview-grid';
+    names.forEach(n => grid.appendChild(makePreviewCard(n)));
+    openPreview({ title: header.textContent.trim(), nodes: [ grid ] });
+  });
+});
+</script>
+</body>
+</html>
