@@ -692,7 +692,7 @@ function openMatrix() {
   if (!host) {
     const warn = document.createElement('div');
     warn.style.color = '#f55'; warn.style.fontSize='14px'; warn.style.padding='8px';
-    warn.textContent = 'Cannot embed Twitch on file://. Serve this page via HTTP (e.g., http://localhost or http://192.168.x.x).';
+    warn.textContent = 'Cannot embed Twitch on file://. Serve this page via HTTP (e.g., http://localhost).';
     matrixBody.appendChild(warn);
   }
 
