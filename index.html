@@ -149,6 +149,17 @@
       padding:4px 12px; border-radius:6px; cursor:pointer; font-size:10px;
     }
     .matrix-refresh:hover { filter:brightness(1.1); }
+    .matrix-refresh-countdown {
+      position:absolute;
+      left:calc(50% + 58px);
+      top:50%;
+      transform:translateY(-50%);
+      color:#cfcfd4;
+      font-size:10px;
+      opacity:.9;
+      min-width:34px;
+      text-align:left;
+    }
     .matrix-body {
       flex:1;
       overflow:auto;
@@ -303,6 +314,7 @@
       <div class="matrix-header">
         <div class="preview-title">Matrix</div>
         <button class="matrix-refresh" id="matrixRefreshBtn">Refresh</button>
+        <div class="matrix-refresh-countdown" id="matrixRefreshCountdown" aria-live="polite"></div>
         <button class="matrix-close" aria-label="Close">×</button>
       </div>
       <div class="matrix-body" id="matrixBody"></div>
@@ -760,7 +772,9 @@ function makePreviewCard(name) {
 /* ---------- Matrix Overlay (embedded players) ---------- */
 const matrixBackdrop = document.getElementById('matrixBackdrop');
 const matrixBody = document.getElementById('matrixBody');
+const matrixRefreshCountdownEl = document.getElementById('matrixRefreshCountdown');
 let matrixRefreshIntervalId = null;
+let matrixCountdownSeconds = 0;
 function hostName(){ return window.location.hostname; }
 
 function buildPlayerSrc(name) {
@@ -791,13 +805,31 @@ function stopMatrixRefreshInterval() {
   matrixRefreshIntervalId = null;
 }
 
+function formatRemainingSeconds(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+function renderMatrixRefreshCountdown() {
+  if (!matrixRefreshCountdownEl) return;
+  matrixRefreshCountdownEl.textContent = formatRemainingSeconds(matrixCountdownSeconds);
+}
+
 function startMatrixRefreshInterval() {
   stopMatrixRefreshInterval();
   const minutes = getRefreshMinutes();
+  matrixCountdownSeconds = Math.max(0, minutes * 60);
+  renderMatrixRefreshCountdown();
   if (minutes <= 0) return;
   matrixRefreshIntervalId = setInterval(() => {
+    matrixCountdownSeconds = Math.max(0, matrixCountdownSeconds - 1);
+    renderMatrixRefreshCountdown();
+    if (matrixCountdownSeconds > 0) return;
+    matrixCountdownSeconds = minutes * 60;
+    renderMatrixRefreshCountdown();
     refreshDisplayedMatrixStreams().catch(err => console.error("Interval refresh failed", err));
-  }, minutes * 60 * 1000);
+  }, 1000);
 }
 
 function getDisplayedMatrixStreams() {
@@ -970,6 +1002,8 @@ function openMatrix() {
 
 function closeMatrix() {
   stopMatrixRefreshInterval();
+  matrixCountdownSeconds = 0;
+  matrixRefreshCountdownEl.textContent = '';
   matrixBackdrop.style.display = 'none';
   matrixBody.innerHTML = '';
   document.body.style.overflow = '';
