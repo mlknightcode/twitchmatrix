@@ -140,20 +140,21 @@
       padding:10px 12px; background:#0a0a0a; border-bottom:1px solid #111;
       color:#ddd;
     }
+    .matrix-header .preview-title { font-size:10px; }
     .matrix-close { cursor:pointer; font-size:20px; line-height:1; background:none; border:0; color:#ddd; }
     .matrix-close:hover { color:#fff; }
     .matrix-refresh {
       position:absolute; left:50%; transform:translateX(-50%);
       background:var(--accent); color:#fff; border:0;
-      padding:4px 12px; border-radius:6px; cursor:pointer; font-size:14px;
+      padding:4px 12px; border-radius:6px; cursor:pointer; font-size:10px;
     }
     .matrix-refresh:hover { filter:brightness(1.1); }
     .matrix-body {
       flex:1;
       overflow:auto;
-      padding:4px;
+      padding:1px;
       display:grid;
-      gap:4px;
+      gap:1px;
       background:#000;
     }
     .tile {
@@ -300,7 +301,7 @@
   <div class="matrix-backdrop" id="matrixBackdrop">
     <div class="matrix-modal">
       <div class="matrix-header">
-        <div class="preview-title">Embedded Matrix</div>
+        <div class="preview-title">Matrix</div>
         <button class="matrix-refresh" id="matrixRefreshBtn">Refresh</button>
         <button class="matrix-close" aria-label="Close">×</button>
       </div>
