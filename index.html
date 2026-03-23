@@ -222,6 +222,13 @@
             <button class="step-btn down" data-target="inputSize">▼</button>
           </div>
         </div>
+        <div class="field">Refresh
+          <div class="stepper">
+            <button class="step-btn up" data-target="inputRefresh">▲</button>
+            <input type="number" id="inputRefresh" min="0" max="240" step="1" value="20" aria-label="Refresh">
+            <button class="step-btn down" data-target="inputRefresh">▼</button>
+          </div>
+        </div>
       </div>
 
       <!-- Row 2–4: Vertical limits (↑ / inputs / ↓) -->
@@ -380,11 +387,12 @@ const LS_KEY = "twitchcategories_settings_v2";
 function loadSettings(){ try{const r=localStorage.getItem(LS_KEY); return r?JSON.parse(r):null;}catch{return null;} }
 function saveSettings(s){ localStorage.setItem(LS_KEY, JSON.stringify(s)); }
 function getSettings(){
-  const defaults={ batch:20, size:6, limits:[3,1,1,1,0,0], random:[true,true,true,true,true,true] };
+  const defaults={ batch:20, size:6, refresh:20, limits:[3,1,1,1,0,0], random:[true,true,true,true,true,true] };
   const saved=loadSettings();
   return saved?{
     batch: saved.batch ?? defaults.batch,
     size: saved.size ?? defaults.size,
+    refresh: saved.refresh ?? defaults.refresh,
     limits: Array.isArray(saved.limits)? saved.limits.concat([0,0,0,0,0,0]).slice(0,6) : defaults.limits,
     random: Array.isArray(saved.random)? saved.random.concat([true,true,true,true,true,true]).slice(0,6) : defaults.random
   }:defaults;
@@ -685,17 +693,22 @@ function initPersistence(){
   const s=getSettings();
   document.getElementById("inputBatch").value=s.batch;
   document.getElementById("inputSize").value=s.size;
+  document.getElementById("inputRefresh").value=s.refresh;
   ["lim1","lim2","lim3","lim4","lim5","lim6"].forEach((id,i)=>document.getElementById(id).value=s.limits[i]);
   [1,2,3,4,5,6].forEach(i=>document.getElementById("rand"+i).checked=!!s.random[i-1]);
   function persist(){
     saveSettings({
       batch: parseInt(document.getElementById("inputBatch").value||"20",10),
       size: parseInt(document.getElementById("inputSize").value||"6",10),
+      refresh: parseInt(document.getElementById("inputRefresh").value||"20",10),
       limits: [1,2,3,4,5,6].map(i=>parseInt(document.getElementById("lim"+i).value||"0",10) || 0),
       random: [1,2,3,4,5,6].map(i=>document.getElementById("rand"+i).checked)
     });
   }
-  document.querySelectorAll('#inputBatch,#inputSize,#lim1,#lim2,#lim3,#lim4,#lim5,#lim6').forEach(el=>el.addEventListener("change", persist));
+  document.querySelectorAll('#inputBatch,#inputSize,#inputRefresh,#lim1,#lim2,#lim3,#lim4,#lim5,#lim6').forEach(el=>el.addEventListener("change", persist));
+  document.getElementById("inputRefresh").addEventListener("change", () => {
+    if (matrixBackdrop.style.display === 'flex') startMatrixRefreshInterval();
+  });
   [1,2,3,4,5,6].forEach(i=>document.getElementById("rand"+i).addEventListener("change", persist));
 }
 
@@ -746,6 +759,7 @@ function makePreviewCard(name) {
 /* ---------- Matrix Overlay (embedded players) ---------- */
 const matrixBackdrop = document.getElementById('matrixBackdrop');
 const matrixBody = document.getElementById('matrixBody');
+let matrixRefreshIntervalId = null;
 function hostName(){ return window.location.hostname; }
 
 function buildPlayerSrc(name) {
@@ -765,6 +779,63 @@ function refreshMatrixTile(name, iframe) {
   iframe.src = buildPlayerSrc(name);
 }
 
+function getRefreshMinutes() {
+  const n = parseInt(document.getElementById("inputRefresh")?.value || "20", 10);
+  return Number.isFinite(n) && n >= 0 ? n : 20;
+}
+
+function stopMatrixRefreshInterval() {
+  if (!matrixRefreshIntervalId) return;
+  clearInterval(matrixRefreshIntervalId);
+  matrixRefreshIntervalId = null;
+}
+
+function startMatrixRefreshInterval() {
+  stopMatrixRefreshInterval();
+  const minutes = getRefreshMinutes();
+  if (minutes <= 0) return;
+  matrixRefreshIntervalId = setInterval(() => {
+    refreshDisplayedMatrixStreams().catch(err => console.error("Interval refresh failed", err));
+  }, minutes * 60 * 1000);
+}
+
+function getDisplayedMatrixStreams() {
+  return Array.from(matrixBody.querySelectorAll('.tile[data-streamer]'))
+    .map(tile => tile.dataset.streamer)
+    .filter(Boolean);
+}
+
+async function refreshDisplayedMatrixStreams() {
+  if (matrixBackdrop.style.display !== 'flex') return;
+  const displayed = getDisplayedMatrixStreams();
+  if (!displayed.length) return;
+
+  const fetched = await fetchBatch(displayed);
+  let anyOffline = false;
+  fetched.forEach((r, idx) => {
+    const name = displayed[idx];
+    resultsCache.set(name, r);
+    paintLabel(name, r);
+    if (!r?.isLive) anyOffline = true;
+  });
+
+  if (anyOffline) {
+    await refreshMatrix();
+    return;
+  }
+
+  const tiles = Array.from(matrixBody.querySelectorAll('.tile[data-streamer]'));
+  for (let i = 0; i < tiles.length; i++) {
+    const tile = tiles[i];
+    const name = tile.dataset.streamer;
+    const iframe = tile.querySelector('iframe');
+    refreshMatrixTile(name, iframe);
+    if (i < tiles.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+  }
+}
+
 
 function openMatrix() {
   if (!lastLive.length) return;
@@ -782,6 +853,7 @@ function openMatrix() {
   lastLive.forEach(name => {
     const tile = document.createElement('div');
     tile.className = 'tile';
+    tile.dataset.streamer = name;
 
     const hint = document.createElement('div');
     hint.className = 'fade-hint';
@@ -889,12 +961,14 @@ function openMatrix() {
 
   document.body.style.overflow = 'hidden';
   matrixBackdrop.style.display = 'flex';
+  startMatrixRefreshInterval();
   // Initial layout + responsive relayout
   applyLayout();
   window.addEventListener('resize', applyLayout, { passive: true });
 }
 
 function closeMatrix() {
+  stopMatrixRefreshInterval();
   matrixBackdrop.style.display = 'none';
   matrixBody.innerHTML = '';
   document.body.style.overflow = '';
