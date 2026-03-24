@@ -136,29 +136,36 @@
     }
     .matrix-header {
       position:relative;
-      display:flex; align-items:center; justify-content:space-between;
-      padding:10px 12px; background:#0a0a0a; border-bottom:1px solid #111;
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      padding:10px 12px;
+      background:#0a0a0a;
+      border-bottom:1px solid #111;
       color:#ddd;
+      min-height:42px;
     }
-    .matrix-header .preview-title { font-size:10px; }
     .matrix-close { cursor:pointer; font-size:20px; line-height:1; background:none; border:0; color:#ddd; }
     .matrix-close:hover { color:#fff; }
     .matrix-refresh {
-      position:absolute; left:50%; transform:translateX(-50%);
+      position:absolute;
+      left:12px;
+      top:50%;
+      transform:translateY(-50%);
       background:var(--accent); color:#fff; border:0;
       padding:4px 12px; border-radius:6px; cursor:pointer; font-size:10px;
     }
     .matrix-refresh:hover { filter:brightness(1.1); }
     .matrix-refresh-countdown {
       position:absolute;
-      left:calc(50% + 58px);
+      left:50%;
       top:50%;
-      transform:translateY(-50%);
+      transform:translate(-50%, -50%);
       color:#cfcfd4;
       font-size:10px;
       opacity:.9;
       min-width:34px;
-      text-align:left;
+      text-align:center;
     }
     .matrix-body {
       flex:1;
@@ -312,7 +319,6 @@
   <div class="matrix-backdrop" id="matrixBackdrop">
     <div class="matrix-modal">
       <div class="matrix-header">
-        <div class="preview-title">Matrix</div>
         <button class="matrix-refresh" id="matrixRefreshBtn">Refresh</button>
         <div class="matrix-refresh-countdown" id="matrixRefreshCountdown" aria-live="polite"></div>
         <button class="matrix-close" aria-label="Close">×</button>
@@ -813,6 +819,11 @@ function formatRemainingSeconds(seconds) {
 
 function renderMatrixRefreshCountdown() {
   if (!matrixRefreshCountdownEl) return;
+  const minutes = getRefreshMinutes();
+  if (minutes <= 0) {
+    matrixRefreshCountdownEl.textContent = '';
+    return;
+  }
   matrixRefreshCountdownEl.textContent = formatRemainingSeconds(matrixCountdownSeconds);
 }
 
