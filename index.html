@@ -800,6 +800,17 @@ function refreshMatrixTile(name, iframe) {
   iframe.src = buildPlayerSrc(name);
 }
 
+function nudgeMatrixTile(iframe) {
+  if (!iframe) return;
+  const rect = iframe.getBoundingClientRect();
+  const clickX = rect.left + (rect.width / 2); // centered horizontally
+  const clickY = rect.top + (rect.height * 0.7); // 30% up from the bottom
+  iframe.focus({ preventScroll: true });
+  iframe.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, clientX: clickX, clientY: clickY }));
+  iframe.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, clientX: clickX, clientY: clickY }));
+  iframe.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: clickX, clientY: clickY }));
+}
+
 function getRefreshMinutes() {
   const n = parseInt(document.getElementById("inputRefresh")?.value || "0", 10);
   return Number.isFinite(n) && n >= 0 ? n : 0;
@@ -832,8 +843,9 @@ function startMatrixRefreshInterval() {
   const minutes = getRefreshMinutes();
   matrixCountdownSeconds = Math.max(0, minutes * 60);
   renderMatrixRefreshCountdown();
-  if (minutes <= 0) return;
   matrixRefreshIntervalId = setInterval(() => {
+    nudgeDisplayedMatrixStreams();
+    if (minutes <= 0) return;
     matrixCountdownSeconds = Math.max(0, matrixCountdownSeconds - 1);
     renderMatrixRefreshCountdown();
     if (matrixCountdownSeconds > 0) return;
@@ -847,6 +859,11 @@ function getDisplayedMatrixStreams() {
   return Array.from(matrixBody.querySelectorAll('.tile[data-streamer]'))
     .map(tile => tile.dataset.streamer)
     .filter(Boolean);
+}
+
+function nudgeDisplayedMatrixStreams() {
+  if (matrixBackdrop.style.display !== 'flex') return;
+  matrixBody.querySelectorAll('.tile[data-streamer] iframe').forEach(iframe => nudgeMatrixTile(iframe));
 }
 
 async function refreshDisplayedMatrixStreams() {
