@@ -781,6 +781,7 @@ const matrixBody = document.getElementById('matrixBody');
 const matrixRefreshCountdownEl = document.getElementById('matrixRefreshCountdown');
 let matrixRefreshIntervalId = null;
 let matrixCountdownSeconds = 0;
+let matrixResizeHandler = null;
 function hostName(){ return window.location.hostname; }
 
 function buildPlayerSrc(name) {
@@ -839,7 +840,8 @@ function startMatrixRefreshInterval() {
     if (matrixCountdownSeconds > 0) return;
     matrixCountdownSeconds = minutes * 60;
     renderMatrixRefreshCountdown();
-    refreshDisplayedMatrixStreams().catch(err => console.error("Interval refresh failed", err));
+    refreshDisplayedMatrixStreams()
+      .catch(err => console.error("Interval refresh failed", err));
   }, 1000);
 }
 
@@ -1008,7 +1010,9 @@ function openMatrix() {
   startMatrixRefreshInterval();
   // Initial layout + responsive relayout
   applyLayout();
-  window.addEventListener('resize', applyLayout, { passive: true });
+  if (matrixResizeHandler) window.removeEventListener('resize', matrixResizeHandler);
+  matrixResizeHandler = applyLayout;
+  window.addEventListener('resize', matrixResizeHandler, { passive: true });
 }
 
 function closeMatrix() {
@@ -1018,6 +1022,10 @@ function closeMatrix() {
   matrixBackdrop.style.display = 'none';
   matrixBody.innerHTML = '';
   document.body.style.overflow = '';
+  if (matrixResizeHandler) {
+    window.removeEventListener('resize', matrixResizeHandler);
+    matrixResizeHandler = null;
+  }
 }
 matrixBackdrop.querySelector('.matrix-close').addEventListener('click', closeMatrix);
 matrixBackdrop.addEventListener('click', (e)=>{ if (e.target === matrixBackdrop) closeMatrix(); });
