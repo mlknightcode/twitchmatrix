@@ -403,11 +403,61 @@ let sessionBlacklist = new Set();
 
 /* ---------- Persistence ---------- */
 const LS_KEY = "twitchcategories_settings_v2";
+const COOKIE_SETTINGS_KEY = "twitchcategories_settings_v2";
+const COOKIE_PINS_KEY = "twitchcategories_pins_v1";
+const COOKIE_BLACKLIST_KEY = "twitchcategories_blacklist_v1";
 function loadSettings(){ try{const r=localStorage.getItem(LS_KEY); return r?JSON.parse(r):null;}catch{return null;} }
 function saveSettings(s){ localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+function readCookie(name){
+  const parts = document.cookie ? document.cookie.split("; ") : [];
+  for(const part of parts){
+    const i = part.indexOf("=");
+    if(i<0) continue;
+    const key = decodeURIComponent(part.slice(0, i));
+    if(key !== name) continue;
+    return decodeURIComponent(part.slice(i + 1));
+  }
+  return null;
+}
+function writeCookie(name, value, days=365){
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+}
+function loadCookieJSON(name){
+  try{
+    const raw = readCookie(name);
+    return raw ? JSON.parse(raw) : null;
+  }catch{
+    return null;
+  }
+}
+function parseNameList(raw){
+  if(!raw) return [];
+  return raw.split(",").map(s=>s.trim()).filter(Boolean);
+}
+function savePinBlacklistCookies(){
+  writeCookie(COOKIE_PINS_KEY, [...sessionPins].join(","));
+  writeCookie(COOKIE_BLACKLIST_KEY, [...sessionBlacklist].join(","));
+}
+function loadPinBlacklistFromCookies(){
+  sessionPins = new Set(parseNameList(readCookie(COOKIE_PINS_KEY)));
+  sessionBlacklist = new Set(parseNameList(readCookie(COOKIE_BLACKLIST_KEY)));
+  sessionPins.forEach(n=>{ if(sessionBlacklist.has(n)) sessionBlacklist.delete(n); });
+}
+function syncPinBlacklistButtons(){
+  document.querySelectorAll(".streamer").forEach(row=>{
+    const name=row.querySelector(".pin-btn")?.dataset?.name; if(!name) return;
+    const pin=row.querySelector(".pin-btn");
+    const black=row.querySelector(".black-btn");
+    if(pin) pin.classList.toggle("active", sessionPins.has(name));
+    if(black) black.classList.toggle("active", sessionBlacklist.has(name));
+  });
+}
 function getSettings(){
   const defaults={ batch:20, size:6, refresh:0, limits:[3,1,1,1,0,0], random:[true,true,true,true,true,true] };
-  const saved=loadSettings();
+  const savedCookie=loadCookieJSON(COOKIE_SETTINGS_KEY);
+  const savedLocal=loadSettings();
+  const saved = savedCookie ?? savedLocal;
   return saved?{
     batch: saved.batch ?? defaults.batch,
     size: saved.size ?? defaults.size,
@@ -445,12 +495,14 @@ function buildStreamerRow(name){
   pinBtn.onclick=()=>{const n=name;
     if(sessionPins.has(n)){ sessionPins.delete(n); pinBtn.classList.remove("active"); }
     else { sessionPins.add(n); pinBtn.classList.add("active"); sessionBlacklist.delete(n); blackBtn.classList.remove("active"); }
+    savePinBlacklistCookies();
   };
 
   const blackBtn=document.createElement("button"); blackBtn.className="black-btn"; blackBtn.innerText="✖"; blackBtn.title="Blacklist (exclude)"; blackBtn.dataset.name=name;
   blackBtn.onclick=()=>{const n=name;
     if(sessionBlacklist.has(n)){ sessionBlacklist.delete(n); blackBtn.classList.remove("active"); }
     else { sessionBlacklist.add(n); blackBtn.classList.add("active"); sessionPins.delete(n); pinBtn.classList.remove("active"); }
+    savePinBlacklistCookies();
   };
 
   if(sessionPins.has(name)) pinBtn.classList.add("active");
@@ -585,14 +637,8 @@ async function retrieveAll(){
     const visible = new Set(tiers.flat());
     prevPins.forEach(n=>{ if(visible.has(n)) sessionPins.add(n); });
     prevBlack.forEach(n=>{ if(visible.has(n)) sessionBlacklist.add(n); });
-    // Sync button styles
-    document.querySelectorAll(".streamer").forEach(row=>{
-      const name=row.querySelector(".pin-btn")?.dataset?.name; if(!name) return;
-      const pin=row.querySelector(".pin-btn");
-      const black=row.querySelector(".black-btn");
-      if(pin) pin.classList.toggle("active", sessionPins.has(name));
-      if(black) black.classList.toggle("active", sessionBlacklist.has(name));
-    });
+    savePinBlacklistCookies();
+    syncPinBlacklistButtons();
 
     // 4) Batched status checks for ALL visible names
     const allNames=[...new Set(tiers.flat())];
@@ -716,13 +762,15 @@ function initPersistence(){
   ["lim1","lim2","lim3","lim4","lim5","lim6"].forEach((id,i)=>document.getElementById(id).value=s.limits[i]);
   [1,2,3,4,5,6].forEach(i=>document.getElementById("rand"+i).checked=!!s.random[i-1]);
   function persist(){
-    saveSettings({
+    const nextSettings = {
       batch: parseInt(document.getElementById("inputBatch").value||"20",10),
       size: parseInt(document.getElementById("inputSize").value||"6",10),
       refresh: parseInt(document.getElementById("inputRefresh").value||"0",10),
       limits: [1,2,3,4,5,6].map(i=>parseInt(document.getElementById("lim"+i).value||"0",10) || 0),
       random: [1,2,3,4,5,6].map(i=>document.getElementById("rand"+i).checked)
-    });
+    };
+    saveSettings(nextSettings);
+    writeCookie(COOKIE_SETTINGS_KEY, JSON.stringify(nextSettings));
   }
   document.querySelectorAll('#inputBatch,#inputSize,#inputRefresh,#lim1,#lim2,#lim3,#lim4,#lim5,#lim6').forEach(el=>el.addEventListener("change", persist));
   document.getElementById("inputRefresh").addEventListener("change", () => {
@@ -924,6 +972,7 @@ function openMatrix() {
     xbtn.onclick = () => {
       sessionBlacklist.add(name);
       sessionPins.delete(name);
+      savePinBlacklistCookies();
       refreshMatrix();
     };
 
@@ -1045,7 +1094,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     statusEl.textContent = "Failed to load static tiers file.";
   }
 
+  loadPinBlacklistFromCookies();
   setupGrid();
+  syncPinBlacklistButtons();
   initPersistence();
   attachStepperHandlers();
   statusEl.textContent = "Idle. Grid is ready. Click ‘Retrieve’ to fetch categories and statuses.";
