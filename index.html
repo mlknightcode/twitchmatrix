@@ -175,6 +175,40 @@
       transform:translateX(-50%);
       z-index:1;
     }
+    .matrix-online-feed{
+      position:absolute;
+      left:calc(50% + 30px);
+      right:40px;
+      top:50%;
+      transform:translateY(-50%);
+      overflow:hidden;
+      padding:0 7px;
+      pointer-events:none;
+      white-space:nowrap;
+      min-height:14px;
+    }
+    .matrix-online-feed-track{
+      display:inline-flex;
+      align-items:center;
+      white-space:nowrap;
+      will-change:transform;
+      animation-name:matrixFeedScrollRight;
+      animation-timing-function:linear;
+      animation-iteration-count:infinite;
+    }
+    .matrix-online-feed-segment{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding-right:10px;
+      color:#3dfb55;
+      font-size:11px;
+      line-height:1.2;
+    }
+    @keyframes matrixFeedScrollRight{
+      from{ transform:translateX(-50%); }
+      to{ transform:translateX(0); }
+    }
     .matrix-tier-stats{
       display:flex;
       gap:4px;
@@ -235,6 +269,25 @@
       left:6px;
       color:#d7d7ff;
       border-radius:50%;
+    }
+    .matrix-streamer-name{
+      position:absolute;
+      top:6px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:2;
+      padding:2px 6px;
+      max-width:62%;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      background:rgba(0,0,0,.72);
+      color:#fff;
+      border-radius:4px;
+      font-size:11px;
+      line-height:1.2;
+      font-weight:600;
+      pointer-events:none;
     }
   </style>
 </head>
@@ -342,6 +395,7 @@
         <button class="matrix-refresh" id="matrixRefreshBtn">Refresh</button>
         <div class="matrix-tier-stats" id="matrixTierStats" aria-live="polite"></div>
         <div class="matrix-refresh-countdown" id="matrixRefreshCountdown" aria-live="polite"></div>
+        <div class="matrix-online-feed" id="matrixOnlineFeed" aria-live="polite"></div>
         <button class="matrix-close" aria-label="Close">×</button>
       </div>
       <div class="matrix-body" id="matrixBody"></div>
@@ -707,6 +761,7 @@ async function retrieveAll(){
     }
     statusEl.textContent = "Retrieve complete. Click Generate to pick from cache.";
     renderTierOnlineSnapshot();
+    renderMatrixOnlineFeed();
   }catch(e){
     console.error(e);
     statusEl.textContent = "Retrieve failed (categories or status). See console for details.";
@@ -759,9 +814,11 @@ function generateFromCache(){
     openBtn.disabled=false; multiBtn.disabled=false; matrixBtn.disabled=false;
     statusEl.innerHTML = `<strong>Picked ${live.length}/${size}</strong> from: ${usedTiers.join(", ")}`;
     pickedEl.textContent = live.join(", ");
+    renderMatrixOnlineFeed();
   } else {
     statusEl.textContent = "No live streamers matched the rules. Adjust limits/random/pins.";
     pickedEl.textContent=""; openBtn.disabled=true; multiBtn.disabled=true; matrixBtn.disabled=true; lastLive=[];
+    renderMatrixOnlineFeed();
   }
 }
 
@@ -871,6 +928,7 @@ function makePreviewCard(name) {
 const matrixBackdrop = document.getElementById('matrixBackdrop');
 const matrixBody = document.getElementById('matrixBody');
 const matrixRefreshCountdownEl = document.getElementById('matrixRefreshCountdown');
+const matrixOnlineFeedEl = document.getElementById('matrixOnlineFeed');
 let matrixRefreshIntervalId = null;
 let matrixCountdownSeconds = 0;
 let matrixResizeHandler = null;
@@ -941,6 +999,36 @@ function getDisplayedMatrixStreams() {
   return Array.from(matrixBody.querySelectorAll('.tile[data-streamer]'))
     .map(tile => tile.dataset.streamer)
     .filter(Boolean);
+}
+
+function getOnlineFeedNames() {
+  const hidden = new Set(lastLive || []);
+  const names = [];
+  for(let i=0; i<3; i++){
+    for(const name of (tiers[i] || [])){
+      const r = resultsCache.get(name);
+      if(!r?.isLive || hidden.has(name)) continue;
+      names.push(name);
+    }
+  }
+  return names;
+}
+
+function renderMatrixOnlineFeed() {
+  if(!matrixOnlineFeedEl) return;
+  const names = getOnlineFeedNames();
+  if(!names.length){
+    matrixOnlineFeedEl.innerHTML = "";
+    return;
+  }
+  const text = names.join(" • ");
+  const estDuration = Math.min(20, Math.max(7, Math.round(text.length / 4)));
+  matrixOnlineFeedEl.innerHTML = `
+    <div class="matrix-online-feed-track" style="animation-duration:${estDuration}s">
+      <span class="matrix-online-feed-segment">${text}</span>
+      <span class="matrix-online-feed-segment">${text}</span>
+    </div>
+  `;
 }
 
 async function refreshDisplayedMatrixStreams() {
@@ -1020,7 +1108,11 @@ function openMatrix() {
       refreshMatrix();
     };
 
-    tile.append(iframe, refreshBtn, xbtn, hint);
+    const nameBadge = document.createElement('div');
+    nameBadge.className = 'matrix-streamer-name';
+    nameBadge.textContent = name;
+
+    tile.append(iframe, refreshBtn, xbtn, nameBadge, hint);
     matrixBody.appendChild(tile);
 
     // fade the hint after 2.5s
@@ -1100,6 +1192,7 @@ function openMatrix() {
 
   document.body.style.overflow = 'hidden';
   matrixBackdrop.style.display = 'flex';
+  renderMatrixOnlineFeed();
   startMatrixRefreshInterval();
   // Initial layout + responsive relayout
   applyLayout();
@@ -1114,6 +1207,7 @@ function closeMatrix() {
   matrixRefreshCountdownEl.textContent = '';
   matrixBackdrop.style.display = 'none';
   matrixBody.innerHTML = '';
+  if (matrixOnlineFeedEl) matrixOnlineFeedEl.innerHTML = '';
   document.body.style.overflow = '';
   if (matrixResizeHandler) {
     window.removeEventListener('resize', matrixResizeHandler);
