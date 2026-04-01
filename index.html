@@ -13,6 +13,16 @@
 
     .status { margin-top:6px; color: var(--muted); font-size:14px; min-height:20px; }
     .picked { margin-top:2px; color: #e6e6e8; font-size:14px; min-height:18px; }
+    .tier-pill{
+      border:1px solid var(--border);
+      background:#232329;
+      color:#d9d9de;
+      border-radius:999px;
+      padding:2px 8px;
+      font-size:11px;
+      white-space:nowrap;
+    }
+    .tier-pill .online-count{ color:#3dfb55; font-weight:700; }
 
     /* Controls */
     .controls { width:100%; max-width:1100px; display:flex; flex-direction:column; gap:10px; margin-top:6px; }
@@ -138,7 +148,8 @@
       position:relative;
       display:flex;
       align-items:center;
-      justify-content:flex-end;
+      justify-content:flex-start;
+      gap:8px;
       padding:10px 12px;
       background:#0a0a0a;
       border-bottom:1px solid #111;
@@ -148,25 +159,29 @@
     .matrix-close { cursor:pointer; font-size:20px; line-height:1; background:none; border:0; color:#ddd; }
     .matrix-close:hover { color:#fff; }
     .matrix-refresh {
-      position:absolute;
-      left:12px;
-      top:50%;
-      transform:translateY(-50%);
       background:var(--accent); color:#fff; border:0;
       padding:4px 12px; border-radius:6px; cursor:pointer; font-size:10px;
+      flex:0 0 auto;
     }
     .matrix-refresh:hover { filter:brightness(1.1); }
     .matrix-refresh-countdown {
-      position:absolute;
-      left:50%;
-      top:50%;
-      transform:translate(-50%, -50%);
       color:#cfcfd4;
       font-size:10px;
       opacity:.9;
       min-width:34px;
       text-align:center;
+      flex:0 0 auto;
     }
+    .matrix-tier-stats{
+      display:flex;
+      gap:4px;
+      flex:1 1 auto;
+      min-width:0;
+      overflow-x:auto;
+      scrollbar-width:thin;
+      padding-bottom:1px;
+    }
+    .matrix-close{ margin-left:auto; }
     .matrix-body {
       flex:1;
       overflow:auto;
@@ -320,6 +335,7 @@
     <div class="matrix-modal">
       <div class="matrix-header">
         <button class="matrix-refresh" id="matrixRefreshBtn">Refresh</button>
+        <div class="matrix-tier-stats" id="matrixTierStats" aria-live="polite"></div>
         <div class="matrix-refresh-countdown" id="matrixRefreshCountdown" aria-live="polite"></div>
         <button class="matrix-close" aria-label="Close">×</button>
       </div>
@@ -391,6 +407,7 @@ const categoryTopQuery = `query CategoryTop($name: String!, $limit: Int!) {
 /* ---------- State ---------- */
 const statusEl = document.getElementById("status");
 const pickedEl = document.getElementById("pickedNames");
+const matrixTierStatsEl = document.getElementById("matrixTierStats");
 const openBtn = document.getElementById("openLink");
 const multiBtn = document.getElementById("openMulti");
 const matrixBtn = document.getElementById("matrixBtn");
@@ -484,6 +501,25 @@ function orderedTierNames(i, pinned, blacklist, tierRandomize){
 function getBatchSize(){
   const n = parseInt(document.getElementById("inputBatch")?.value || "20", 10);
   return Number.isFinite(n) && n>0 ? n : 20;
+}
+function getTierOnlineSnapshot(){
+  const limits = readLimits();
+  return [0,1,2].map(i => {
+    const names = tiers[i] || [];
+    const online = names.reduce((acc, name) => acc + (resultsCache.get(name)?.isLive ? 1 : 0), 0);
+    return { tier: i + 1, online, total: names.length, limit: limits[i] ?? 0 };
+  });
+}
+function renderTierOnlineSnapshot(){
+  if(!matrixTierStatsEl) return;
+  const snapshot = getTierOnlineSnapshot();
+  const hasLiveData = snapshot.some(s => s.online > 0) || resultsCache.size > 0;
+  const html = snapshot.map(s => `<span class="tier-pill" title="Tier ${s.tier}"><span>${s.limit}</span> / <span class="online-count">${s.online}</span></span>`).join("");
+  if(hasLiveData){
+    matrixTierStatsEl.innerHTML = html;
+  } else {
+    matrixTierStatsEl.innerHTML = "";
+  }
 }
 
 /* ---------- Grid ---------- */
@@ -656,6 +692,7 @@ async function retrieveAll(){
         });
         processed += chunk.length;
         statusEl.textContent = `Retrieved ${processed}/${allNames.length}…`;
+        renderTierOnlineSnapshot();
       }catch(e){
         console.error("Batch error", e);
         markError(chunk);
@@ -664,6 +701,7 @@ async function retrieveAll(){
       }
     }
     statusEl.textContent = "Retrieve complete. Click Generate to pick from cache.";
+    renderTierOnlineSnapshot();
   }catch(e){
     console.error(e);
     statusEl.textContent = "Retrieve failed (categories or status). See console for details.";
