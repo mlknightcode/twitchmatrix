@@ -178,11 +178,11 @@
     .matrix-online-feed{
       position:absolute;
       left:calc(50% + 30px);
-      right:40px;
+      right:41px;
       top:50%;
       transform:translateY(-50%);
       overflow:hidden;
-      padding:0 7px;
+      padding:0;
       pointer-events:none;
       white-space:nowrap;
       min-height:14px;
@@ -192,22 +192,22 @@
       align-items:center;
       white-space:nowrap;
       will-change:transform;
-      animation-name:matrixFeedScrollRight;
+      animation-name:matrixFeedScrollLeft;
       animation-timing-function:linear;
       animation-iteration-count:infinite;
     }
     .matrix-online-feed-segment{
       display:inline-flex;
       align-items:center;
-      gap:10px;
-      padding-right:10px;
+      gap:24px;
+      padding-right:0;
       color:#3dfb55;
       font-size:11px;
       line-height:1.2;
     }
-    @keyframes matrixFeedScrollRight{
-      from{ transform:translateX(-50%); }
-      to{ transform:translateX(0); }
+    @keyframes matrixFeedScrollLeft{
+      from{ transform:translateX(0); }
+      to{ transform:translateX(-50%); }
     }
     .matrix-tier-stats{
       display:flex;
@@ -1022,7 +1022,7 @@ function renderMatrixOnlineFeed() {
     return;
   }
   const text = names.join(" • ");
-  const estDuration = Math.min(20, Math.max(7, Math.round(text.length / 4)));
+  const estDuration = Math.min(10, Math.max(3.5, Math.round(text.length / 8)));
   matrixOnlineFeedEl.innerHTML = `
     <div class="matrix-online-feed-track" style="animation-duration:${estDuration}s">
       <span class="matrix-online-feed-segment">${text}</span>
