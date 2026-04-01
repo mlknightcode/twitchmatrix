@@ -170,16 +170,21 @@
       opacity:.9;
       min-width:34px;
       text-align:center;
-      flex:0 0 auto;
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:1;
     }
     .matrix-tier-stats{
       display:flex;
       gap:4px;
-      flex:1 1 auto;
-      min-width:0;
+      position:absolute;
+      left:84px;
+      right:50%;
       overflow-x:auto;
       scrollbar-width:thin;
       padding-bottom:1px;
+      justify-content:center;
     }
     .matrix-close{ margin-left:auto; }
     .matrix-body {
@@ -811,6 +816,7 @@ function initPersistence(){
     writeCookie(COOKIE_SETTINGS_KEY, JSON.stringify(nextSettings));
   }
   document.querySelectorAll('#inputBatch,#inputSize,#inputRefresh,#lim1,#lim2,#lim3,#lim4,#lim5,#lim6').forEach(el=>el.addEventListener("change", persist));
+  [1,2,3,4,5,6].forEach(i=>document.getElementById("lim"+i).addEventListener("change", renderTierOnlineSnapshot));
   document.getElementById("inputRefresh").addEventListener("change", () => {
     if (matrixBackdrop.style.display === 'flex') startMatrixRefreshInterval();
   });
