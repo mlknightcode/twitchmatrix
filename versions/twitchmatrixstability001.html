@@ -708,6 +708,13 @@ async function fetchCategoryTop(catName, limit){
   return [];
 }
 
+function pruneResultsCacheToVisibleNames() {
+  const visibleNames = new Set(tiers.flat());
+  for (const name of resultsCache.keys()) {
+    if (!visibleNames.has(name)) resultsCache.delete(name);
+  }
+}
+
 /* ---------- Phase 1: Retrieve ---------- */
 async function retrieveAll(){
   try{
@@ -726,6 +733,7 @@ async function retrieveAll(){
     // Replace Tier 5/6
     replaceTier(4, irl);
     replaceTier(5, jc);
+    pruneResultsCacheToVisibleNames();
 
     // 3) Re-apply pins/blacklist only if name is still visible
     const prevPins=new Set(sessionPins), prevBlack=new Set(sessionBlacklist);
@@ -1208,6 +1216,7 @@ function closeMatrix() {
   stopMatrixRefreshInterval();
   matrixCountdownSeconds = 0;
   matrixRefreshCountdownEl.textContent = '';
+  matrixBody.querySelectorAll('iframe').forEach((iframe) => { iframe.src = 'about:blank'; });
   matrixBackdrop.style.display = 'none';
   matrixBody.innerHTML = '';
   if (matrixOnlineFeedEl) matrixOnlineFeedEl.innerHTML = '';
