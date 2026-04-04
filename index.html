@@ -943,6 +943,7 @@ function buildPlayerSrc(name) {
   params.set('autoplay', 'true');
   params.set('muted', 'true');
   params.set('controls', 'false');
+  params.set('quality', '360p');
   params.set('ts', Date.now().toString());
   return `https://player.twitch.tv/?${params.toString()}`;
 }
@@ -1058,16 +1059,16 @@ async function refreshDisplayedMatrixStreams() {
     const iframe = tile.querySelector('iframe');
     refreshMatrixTile(name, iframe);
     if (i < tiles.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise(resolve => setTimeout(resolve, 40));
     }
   }
 }
 
 
+
 function openMatrix() {
   if (!lastLive.length) return;
   matrixBody.innerHTML = '';
-
   const host = hostName();
   if (!host) {
     const warn = document.createElement('div');
@@ -1092,6 +1093,7 @@ function openMatrix() {
     const iframe = document.createElement('iframe');
     iframe.src = buildPlayerSrc(name);
     iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+    iframe.loading = 'lazy';
 
     const refreshBtn = document.createElement('button');
     refreshBtn.className = 'matrix-tile-button matrix-refresh-tile';
@@ -1223,6 +1225,7 @@ async function refreshMatrix() {
   generateFromCache();
   openMatrix();
 }
+
 
 /* ---------- Boot ---------- */
 document.addEventListener("DOMContentLoaded", async ()=>{
